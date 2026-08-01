@@ -1,0 +1,33 @@
+universe:
+  - NVDA
+  - MSFT
+  - AAPL
+  - GOOGL
+  - META
+  - SPY
+
+data:
+  start: "2015-01-01"
+  end: "2026-12-31"
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  abnormal_return_threshold: 0.50
+
+backtest:
+  initial_capital: 100000
+  transaction_cost_bps: 5
+  slippage_bps: 2
+  signal_lag: 1
+
+strategy:
+  name: "momentum"
+  top_n: 3
+  rebalance_frequency: "M"
+  momentum_horizons:
+    - 21
+    - 63
+    - 126
+
+portfolio_optimization:
+  risk_free_rate: 0.02
+  frontier_points: 25
