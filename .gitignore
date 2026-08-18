@@ -27,6 +27,7 @@ reports/results/*.csv
 results/*.png
 results/*.html
 results/*.csv
+results/key_findings.md
 docs/screenshots/*.png
 docs/screenshots/*.jpg
 .ipynb_checkpoints/
