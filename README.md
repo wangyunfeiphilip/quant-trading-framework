@@ -23,6 +23,35 @@ Main research question:
 Can systematic equity strategies improve risk-adjusted returns compared with passive investing in SPY?
 ```
 
+## Key Findings
+
+The project now generates a reproducible findings report rather than hard-coding stale performance numbers in the README. Running:
+
+```bash
+python main.py
+```
+
+creates:
+
+```text
+results/key_findings.md
+results/strategy_cost_comparison.csv
+results/mean_reversion_2020_stress.csv
+results/factor_exposure.csv
+results/derivative_pricing_comparison.csv
+results/delta_hedging_frequency.csv
+```
+
+The generated findings report covers:
+
+- momentum Sharpe ratio before and after transaction costs and slippage
+- gross turnover as a fraction of average portfolio value
+- mean-reversion maximum drawdown during the Feb-Mar 2020 stress window
+- Fama-French alpha and p-value using official Kenneth French factors
+- cost-adjusted optimal hedge frequency for a short-option delta hedge
+
+This keeps the repository honest: numerical claims are tied to the current data pull, configuration, and generated output files.
+
 ## System Architecture
 
 ```text
@@ -40,6 +69,7 @@ quant-trading-framework/
 │   ├── models/
 │   ├── risk/
 │   ├── portfolio/
+│   ├── derivatives/
 │   └── research/
 ├── cpp_engine/
 ├── notebooks/
@@ -60,6 +90,7 @@ Python is responsible for:
 - statistical analysis
 - strategy research
 - risk analysis
+- derivative pricing and hedging research
 - visualization
 - machine learning models
 
@@ -151,7 +182,48 @@ Variables:
 - `alpha`: unexplained excess return
 - `epsilon`: residual return
 
-The implementation uses statsmodels OLS and reports coefficients, p-values, t-statistics, and R-squared.
+The implementation uses the official Kenneth French daily factor database by default instead of constructing SMB and HML from the small technology-heavy project universe. This matters because NVDA, MSFT, AAPL, GOOGL, and META have limited size and value-style cross-sectional variation.
+
+The regression is estimated with statsmodels OLS and Newey-West HAC standard errors:
+
+```text
+result = OLS(y, X).fit(cov_type="HAC", cov_kwds={"maxlags": L})
+```
+
+HAC standard errors are used because financial return residuals often exhibit heteroskedasticity and serial correlation. The report includes coefficients, robust standard errors, p-values, t-statistics, and R-squared.
+
+### Derivative Pricing and Delta Hedging
+
+The derivatives module adds a stochastic-process component. The stock price follows geometric Brownian motion:
+
+```text
+dS_t = mu S_t dt + sigma S_t dW_t
+```
+
+Under the risk-neutral measure:
+
+```text
+dS_t = (r - q) S_t dt + sigma S_t dW_t
+```
+
+The Black-Scholes PDE is:
+
+```text
+partial V / partial t + 0.5 sigma^2 S^2 partial^2 V / partial S^2
++ (r - q) S partial V / partial S - rV = 0
+```
+
+Implemented derivative research:
+
+- Black-Scholes closed-form price
+- five Greeks: delta, gamma, vega, theta, rho
+- Cox-Ross-Rubinstein binomial tree
+- Monte Carlo pricing under the risk-neutral process
+- antithetic variates and control variates with reported variance reduction
+- Monte Carlo convergence curve against the analytical price
+- short-call delta-hedging simulation using the existing portfolio and execution models
+
+The delta-hedging experiment reports replication error across hedge frequencies. Without transaction costs, discrete hedging error is expected to decline as hedge frequency rises. With costs, very frequent hedging can become suboptimal, so the experiment reports the cost-adjusted hedge interval.
 
 ## Portfolio Optimization
 
@@ -260,6 +332,7 @@ data/processed/clean_stock_data.csv
 data/processed/fundamental_features.csv
 data/processed/feature_dataset.csv
 data/processed/data_quality_report.csv
+data/raw/fama_french_daily_factors.csv
 ```
 
 ## Example Usage
@@ -298,16 +371,26 @@ results/drawdown_curve.png
 results/factor_exposure.png
 results/benchmark_comparison.png
 results/performance_summary.csv
+results/performance_summary_zero_cost.csv
+results/strategy_cost_comparison.csv
+results/key_findings.md
 results/trade_history.csv
 results/portfolio_value.csv
 results/data_quality_report.csv
 results/efficient_frontier.png
 results/efficient_frontier.csv
+results/fama_french_factors.csv
+results/factor_exposure.csv
+results/derivative_pricing_comparison.csv
+results/monte_carlo_convergence.csv
+results/monte_carlo_convergence.png
+results/delta_hedging_frequency.csv
+results/delta_hedging_frequency.png
 ```
 
 ## Configuration
 
-Strategy settings, universe, date range, capital, transaction costs, and slippage are stored in:
+Strategy settings, universe, date range, capital, transaction costs, slippage, Fama-French settings, and derivative experiment settings are stored in:
 
 ```text
 config.yaml

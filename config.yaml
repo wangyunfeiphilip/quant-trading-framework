@@ -31,3 +31,42 @@ strategy:
 portfolio_optimization:
   risk_free_rate: 0.02
   frontier_points: 25
+
+factor_model:
+  source: "kenneth_french"
+  cache_path: "data/raw/fama_french_daily_factors.csv"
+  refresh: false
+  hac_maxlags: 5
+
+derivatives:
+  contract:
+    spot: 100.0
+    strike: 100.0
+    maturity: 1.0
+    rate: 0.04
+    volatility: 0.20
+    dividend_yield: 0.0
+    option_type: "call"
+  binomial_steps: 500
+  monte_carlo:
+    n_paths: 50000
+    seed: 7
+    path_grid:
+      - 1000
+      - 2500
+      - 5000
+      - 10000
+      - 25000
+      - 50000
+  delta_hedging:
+    hedge_intervals:
+      - 1
+      - 2
+      - 5
+      - 10
+      - 21
+    n_paths: 50
+    n_steps: 252
+    transaction_cost_bps: 5
+    slippage_bps: 2
+    seed: 11

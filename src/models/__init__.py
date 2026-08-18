@@ -1,6 +1,11 @@
 """Statistical and machine learning models."""
 
-from models.factor_model import build_proxy_factors, fama_french_regression
+from models.factor_model import (
+    build_proxy_factors,
+    fama_french_regression,
+    load_kenneth_french_factors,
+    parse_kenneth_french_daily_factors,
+)
 from models.prediction_model import (
     ModelResult,
     chronological_train_test_split,
@@ -15,6 +20,8 @@ __all__ = [
     "chronological_train_test_split",
     "create_supervised_dataset",
     "fama_french_regression",
+    "load_kenneth_french_factors",
+    "parse_kenneth_french_daily_factors",
     "rolling_volatility",
     "trend_signal",
     "arima_forecast",

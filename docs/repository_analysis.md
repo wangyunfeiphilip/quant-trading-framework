@@ -11,6 +11,7 @@ The repository is organized as a personal quantitative research framework:
 - `src/risk`: performance and benchmark-relative risk metrics
 - `src/models`: machine learning prediction, factor regression, and time-series tools
 - `src/portfolio`: mean-variance portfolio optimization
+- `src/derivatives`: Black-Scholes pricing, numerical option pricing, and delta hedging
 - `src/research`: single-stock market monitor
 - `cpp_engine`: C++17 order, position, portfolio, and backtesting components
 - `notebooks`: research notebook
@@ -19,7 +20,7 @@ The repository is organized as a personal quantitative research framework:
 
 ## Existing Modules
 
-The project includes data processing, technical indicators, signal generation, portfolio simulation, risk analytics, Fama-French proxy regression, machine learning prediction, portfolio optimization, and C++ simulation components.
+The project includes data processing, technical indicators, signal generation, portfolio simulation, risk analytics, official Kenneth French factor regression, machine learning prediction, derivative pricing, delta-hedging experiments, portfolio optimization, and C++ simulation components.
 
 ## Existing Quantitative Models
 
@@ -27,8 +28,11 @@ The project includes data processing, technical indicators, signal generation, p
 - Bollinger Band mean reversion
 - Composite multi-factor scoring
 - CAPM alpha and beta
-- Fama-French three-factor regression
+- Fama-French three-factor regression with Newey-West HAC standard errors
 - Mean-variance optimization
+- Black-Scholes option pricing and Greeks
+- Binomial and Monte Carlo option pricing
+- Delta-hedging replication error analysis
 - ARIMA time-series forecasting
 - Linear Regression, Random Forest, and Gradient Boosting return prediction
 
