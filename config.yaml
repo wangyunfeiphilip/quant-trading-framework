@@ -1,9 +1,54 @@
 universe:
-  - NVDA
-  - MSFT
   - AAPL
+  - MSFT
+  - NVDA
+  - AMZN
   - GOOGL
   - META
+  - TSLA
+  - AVGO
+  - JPM
+  - V
+  - MA
+  - UNH
+  - LLY
+  - JNJ
+  - XOM
+  - WMT
+  - PG
+  - HD
+  - COST
+  - ABBV
+  - MRK
+  - KO
+  - PEP
+  - BAC
+  - NFLX
+  - ADBE
+  - CRM
+  - ORCL
+  - CSCO
+  - AMD
+  - QCOM
+  - TXN
+  - TMO
+  - ABT
+  - ACN
+  - MCD
+  - NKE
+  - DIS
+  - IBM
+  - GE
+  - CAT
+  - HON
+  - UPS
+  - LOW
+  - GS
+  - MS
+  - CVX
+  - COP
+  - AMGN
+  - LIN
   - SPY
 
 data:
@@ -21,12 +66,17 @@ backtest:
 
 strategy:
   name: "momentum"
-  top_n: 3
+  top_n: 10
   rebalance_frequency: "M"
   momentum_horizons:
     - 21
     - 63
     - 126
+
+parameter_sensitivity:
+  mean_reversion_entry_z: [-1.5, -2.0, -2.5]
+  mean_reversion_exit_z: 0.0
+  window: 20
 
 portfolio_optimization:
   risk_free_rate: 0.02

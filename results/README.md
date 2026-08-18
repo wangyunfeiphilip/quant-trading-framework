@@ -17,6 +17,8 @@ to generate:
 - `performance_summary.csv`
 - `performance_summary_zero_cost.csv`
 - `strategy_cost_comparison.csv`
+- `parameter_sensitivity.csv`
+- `ml_model_comparison.csv`
 - `key_findings.md`
 - `trade_history.csv`
 - `portfolio_value.csv`
