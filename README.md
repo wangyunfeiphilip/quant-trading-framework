@@ -1,12 +1,18 @@
 # Quant Trading Framework
 
-A personal quantitative research framework for equity strategy evaluation, portfolio construction, risk analysis, and factor modeling.
+A personal quantitative research framework for equity strategy evaluation, portfolio construction, risk analysis, factor modeling, derivative pricing, and hedging research.
 
 This repository is designed as a realistic Quantitative Finance / Financial Mathematics portfolio project. It does not present itself as a hedge fund system and does not include fabricated performance numbers. Backtest results and charts are generated only after running the code on market data.
 
 ## Project Overview
 
-The project studies systematic trading ideas on a small U.S. large-cap equity universe:
+This project is a Python/C++ quantitative research framework that connects three areas commonly used in quantitative finance interviews and graduate-level financial mathematics coursework:
+
+- systematic equity strategy research
+- empirical asset pricing and factor regression
+- derivative pricing under stochastic processes
+
+The equity research component studies systematic trading ideas on a small U.S. large-cap universe:
 
 - NVDA
 - MSFT
@@ -17,10 +23,14 @@ The project studies systematic trading ideas on a small U.S. large-cap equity un
 
 The default data period is 2015-2026. The pipeline uses yfinance for public market data, builds technical and fundamental features, generates strategy target weights, runs a signal-lagged backtest, and produces risk reports and charts.
 
+The asset-pricing component estimates Fama-French factor exposures using the official Kenneth French daily factor database and Newey-West HAC robust standard errors. This avoids constructing SMB and HML from an unrealistically narrow mega-cap technology universe.
+
+The derivatives component adds a financial mathematics layer: Black-Scholes pricing, Greeks, binomial trees, Monte Carlo simulation with variance reduction, convergence diagnostics, and a discrete delta-hedging experiment for a short option position. The hedging simulation reuses the existing portfolio and execution-cost infrastructure.
+
 Main research question:
 
 ```text
-Can systematic equity strategies improve risk-adjusted returns compared with passive investing in SPY?
+Can systematic equity strategies improve risk-adjusted returns compared with passive investing in SPY, and how do option-pricing models behave under analytical, numerical, and dynamically hedged implementations?
 ```
 
 ## Key Findings
