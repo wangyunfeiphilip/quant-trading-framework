@@ -1,26 +1,38 @@
-# Quant Trading Framework
+# Quantitative Research Framework: Equity Strategies and Derivatives Pricing
 
-A personal quantitative research framework for equity strategy evaluation, portfolio construction, risk analysis, and factor modeling.
+A personal quantitative research framework for equity strategy evaluation, portfolio construction, risk analysis, factor modeling, derivative pricing, and hedging research.
 
 This repository is designed as a realistic Quantitative Finance / Financial Mathematics portfolio project. It does not present itself as a hedge fund system and does not include fabricated performance numbers. Backtest results and charts are generated only after running the code on market data.
 
 ## Project Overview
 
-The project studies systematic trading ideas on a small U.S. large-cap equity universe:
+This project is a Python/C++ quantitative research framework that connects three areas commonly used in quantitative finance interviews and graduate-level financial mathematics coursework:
 
-- NVDA
-- MSFT
-- AAPL
-- GOOGL
-- META
-- SPY as benchmark
+- systematic equity strategy research
+- empirical asset pricing and factor regression
+- derivative pricing under stochastic processes
+
+The equity research component studies systematic trading ideas on a diversified U.S. large-cap research universe of roughly 50 liquid names plus SPY as the benchmark. The default universe includes mega-cap technology, financials, healthcare, energy, consumer, industrial, and semiconductor names. It is broader than a five-stock winner basket, but it is still not a point-in-time index membership dataset.
+
+Representative tickers include:
+
+```text
+AAPL, MSFT, NVDA, AMZN, GOOGL, META, JPM, V, MA, UNH, JNJ, XOM,
+WMT, PG, HD, COST, ABBV, MRK, KO, PEP, BAC, NFLX, ADBE, CRM,
+ORCL, CSCO, AMD, QCOM, TXN, TMO, ABT, ACN, MCD, NKE, DIS,
+IBM, GE, CAT, HON, UPS, LOW, GS, MS, CVX, COP, AMGN, LIN, SPY
+```
 
 The default data period is 2015-2026. The pipeline uses yfinance for public market data, builds technical and fundamental features, generates strategy target weights, runs a signal-lagged backtest, and produces risk reports and charts.
+
+The asset-pricing component estimates Fama-French factor exposures using the official Kenneth French daily factor database and Newey-West HAC robust standard errors. This avoids constructing SMB and HML from an unrealistically narrow mega-cap technology universe.
+
+The derivatives component adds a financial mathematics layer: Black-Scholes pricing, Greeks, binomial trees, Monte Carlo simulation with variance reduction, convergence diagnostics, and a discrete delta-hedging experiment for a short option position. The hedging simulation reuses the existing portfolio and execution-cost infrastructure.
 
 Main research question:
 
 ```text
-Can systematic equity strategies improve risk-adjusted returns compared with passive investing in SPY?
+Can systematic equity strategies improve risk-adjusted returns compared with passive investing in SPY, and how do option-pricing models behave under analytical, numerical, and dynamically hedged implementations?
 ```
 
 ## Key Findings
@@ -37,6 +49,8 @@ creates:
 results/key_findings.md
 results/strategy_cost_comparison.csv
 results/mean_reversion_2020_stress.csv
+results/parameter_sensitivity.csv
+results/ml_model_comparison.csv
 results/factor_exposure.csv
 results/derivative_pricing_comparison.csv
 results/delta_hedging_frequency.csv
@@ -47,6 +61,8 @@ The generated findings report covers:
 - momentum Sharpe ratio before and after transaction costs and slippage
 - gross turnover as a fraction of average portfolio value
 - mean-reversion maximum drawdown during the Feb-Mar 2020 stress window
+- mean-reversion parameter sensitivity across entry thresholds
+- machine learning baseline diagnostics using chronological validation
 - Fama-French alpha and p-value using official Kenneth French factors
 - cost-adjusted optimal hedge frequency for a short-option delta hedge
 
@@ -163,6 +179,49 @@ Factors:
 - Growth factor: revenue growth
 
 Each factor is standardized cross-sectionally by date before aggregation.
+
+### Parameter Choices and Sensitivity
+
+The project separates research assumptions from optimized parameters.
+
+Momentum horizons:
+
+```text
+21, 63, 126 trading days
+```
+
+These correspond approximately to 1-month, 3-month, and 6-month lookback windows. They are conventional medium-term momentum horizons rather than optimized values from a grid search.
+
+Mean-reversion threshold:
+
+```text
+entry_z = -2.0
+exit_z = 0.0
+```
+
+The default entry threshold follows the common two-standard-deviation Bollinger Band heuristic. The exit rule closes the position when the price reverts to its rolling mean.
+
+Factor strategy weights:
+
+```text
+0.30 Value + 0.30 Momentum + 0.25 Quality + 0.15 Growth
+```
+
+These are subjective research weights, not fitted parameters. They intentionally overweight value and momentum while keeping quality and growth as secondary signals. The README does not claim these weights are optimal.
+
+The pipeline generates a parameter sensitivity file:
+
+```text
+results/parameter_sensitivity.csv
+```
+
+The current sensitivity experiment reruns the mean-reversion strategy with:
+
+```text
+entry_z in {-1.5, -2.0, -2.5}
+```
+
+Large swings in Sharpe ratio or maximum drawdown across these thresholds should be interpreted as model instability and potential overfitting risk.
 
 ### Fama-French Three-Factor Model
 
@@ -312,6 +371,43 @@ The project includes:
 
 ARIMA is included as a baseline time-series forecasting model. Its limitations are documented because financial returns are noisy, non-stationary, and regime-dependent.
 
+## Machine Learning Baselines
+
+The machine learning module is included as a controlled prediction baseline, not as a claimed alpha engine.
+
+Prediction target:
+
+```text
+future_21d_return
+```
+
+Feature set:
+
+- technical indicators: returns, volatility, moving averages, RSI, MACD, Bollinger Z-score
+- factor-style inputs: PE, PB, market capitalization, ROE, revenue growth
+
+Models:
+
+- Linear Regression
+- Random Forest Regressor
+- Gradient Boosting Regressor
+
+Validation design:
+
+- observations are sorted chronologically by date and ticker
+- train/test split is chronological rather than random
+- cross validation uses `TimeSeriesSplit`
+- missing feature values are imputed inside the sklearn pipeline
+- forward returns are used only as labels, never as trading inputs
+
+Generated diagnostics:
+
+```text
+results/ml_model_comparison.csv
+```
+
+The report includes cross-validation negative MSE, test R-squared, MAE, and RMSE. Weak or negative out-of-sample R-squared is treated as an informative result rather than hidden. This is intentional because return prediction is noisy and especially vulnerable to overfitting.
+
 ## Data Pipeline
 
 The data module:
@@ -373,6 +469,8 @@ results/benchmark_comparison.png
 results/performance_summary.csv
 results/performance_summary_zero_cost.csv
 results/strategy_cost_comparison.csv
+results/parameter_sensitivity.csv
+results/ml_model_comparison.csv
 results/key_findings.md
 results/trade_history.csv
 results/portfolio_value.csv
@@ -411,10 +509,12 @@ It is structured as a research report covering objective, data collection, explo
 - Historical results do not guarantee future performance.
 - Market regimes change.
 - yfinance fundamentals are not point-in-time historical fundamentals.
-- The universe is small and not survivorship-bias-free.
+- The equity universe is broader than the original five-stock prototype but is still selected ex post from currently visible large-cap U.S. equities. It is not a point-in-time historical index membership dataset and therefore still contains survivorship and selection bias.
 - The execution model uses simplified close-price fills.
 - Transaction cost and slippage assumptions may differ from live trading.
-- Factor data is proxied from the local universe unless external factor data is supplied.
+- Fama-French factor data uses Kenneth French official factors by default, but factor exposures are still sensitive to sample period and benchmark alignment.
+- Strategy parameters are research assumptions rather than optimized values. Parameter sensitivity analysis is included to expose instability rather than hide it.
+- Machine learning models are baseline prediction diagnostics. They are not used as production trading signals in this repository.
 
 ## Future Improvements
 

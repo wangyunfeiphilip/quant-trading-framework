@@ -18,11 +18,12 @@ sys.path.insert(0, str(SRC_ROOT))
 
 from backtesting.engine import BacktestEngine
 from config_utils import load_config
-from data.data_loader import MarketDataConfig, build_market_dataset, generate_data_quality_report
+from data.data_loader import DEFAULT_TICKERS, MarketDataConfig, build_market_dataset, generate_data_quality_report
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
 from derivatives.delta_hedging import hedging_frequency_experiment
 from derivatives.numerical_methods import binomial_option_price, monte_carlo_convergence, monte_carlo_option_price
 from models.factor_model import build_proxy_factors, fama_french_regression, load_kenneth_french_factors
+from models.prediction_model import train_return_models
 from portfolio.optimization import annualized_covariance, annualized_mean_returns, efficient_frontier
 from risk.risk_metrics import maximum_drawdown, performance_summary
 from strategies.factor_strategy import generate_factor_weights
@@ -33,7 +34,7 @@ from strategies.momentum import generate_momentum_weights
 def _select_strategy(features: pd.DataFrame, config: dict) -> pd.DataFrame:
     strategy_config = config.get("strategy", {})
     strategy_name = strategy_config.get("name", "momentum")
-    top_n = int(strategy_config.get("top_n", 3))
+    top_n = int(strategy_config.get("top_n", 10))
 
     if strategy_name == "momentum":
         horizons = tuple(int(value) for value in strategy_config.get("momentum_horizons", [21, 63, 126]))
@@ -101,6 +102,70 @@ def _save_strategy_comparison(
     comparison.loc["turnover_ratio", "net_of_costs"] = turnover
     comparison.to_csv(output_path)
     return comparison
+
+
+def _run_parameter_sensitivity(
+    features: pd.DataFrame,
+    engine: BacktestEngine,
+    benchmark_returns: pd.Series,
+    config: dict,
+    output_path: Path,
+) -> pd.DataFrame:
+    """Run mean-reversion sensitivity across entry Z-score thresholds."""
+
+    sensitivity_config = config.get("parameter_sensitivity", {})
+    thresholds = sensitivity_config.get("mean_reversion_entry_z", [-1.5, -2.0, -2.5])
+    exit_z = float(sensitivity_config.get("mean_reversion_exit_z", 0.0))
+    window = int(sensitivity_config.get("window", 20))
+
+    rows = []
+    for threshold in thresholds:
+        weights = generate_mean_reversion_weights(
+            features,
+            window=window,
+            entry_z=float(threshold),
+            exit_z=exit_z,
+        )
+        result = engine.run(features, weights)
+        returns = result.portfolio_value.set_index("date")["daily_return"]
+        summary = performance_summary(returns, benchmark_returns=benchmark_returns)
+        rows.append(
+            {
+                "entry_z": float(threshold),
+                "exit_z": exit_z,
+                "window": window,
+                "cumulative_return": summary.get("cumulative_return", np.nan),
+                "annualized_return": summary.get("annualized_return", np.nan),
+                "sharpe_ratio": summary.get("sharpe_ratio", np.nan),
+                "maximum_drawdown": summary.get("maximum_drawdown", np.nan),
+                "trade_count": len(result.trades),
+            }
+        )
+
+    sensitivity = pd.DataFrame(rows).sort_values("entry_z").reset_index(drop=True)
+    sensitivity.to_csv(output_path, index=False)
+    return sensitivity
+
+
+def _run_ml_research(features: pd.DataFrame, output_path: Path) -> pd.DataFrame:
+    """Train baseline return prediction models and save diagnostics."""
+
+    model_results = train_return_models(features)
+    rows = []
+    for name, result in model_results.items():
+        rows.append(
+            {
+                "model": name,
+                "cv_neg_mse_mean": float(np.mean(result.cv_scores)),
+                "cv_neg_mse_std": float(np.std(result.cv_scores, ddof=1)) if len(result.cv_scores) > 1 else 0.0,
+                "test_r2": result.test_r2,
+                "test_mae": result.test_mae,
+                "test_rmse": result.test_rmse,
+            }
+        )
+    diagnostics = pd.DataFrame(rows).sort_values("model").reset_index(drop=True)
+    diagnostics.to_csv(output_path, index=False)
+    return diagnostics
 
 
 def _save_performance_chart(portfolio_value: pd.DataFrame, output_path: Path) -> None:
@@ -309,6 +374,8 @@ def _save_key_findings(
     turnover: float,
     mean_reversion_stress_drawdown: float,
     exposure: pd.DataFrame,
+    sensitivity: pd.DataFrame,
+    ml_diagnostics: pd.DataFrame,
     hedging: pd.DataFrame,
     output_path: Path,
 ) -> None:
@@ -318,6 +385,14 @@ def _save_key_findings(
     best_hedge = hedging.loc[hedging["rmse_plus_cost"].idxmin()] if not hedging.empty else pd.Series(dtype=float)
     alpha = float(exposure.loc["const", "coefficient"]) if "const" in exposure.index else np.nan
     alpha_p = float(exposure.loc["const", "p_value"]) if "const" in exposure.index else np.nan
+    sensitivity_span = np.nan
+    if not sensitivity.empty and "sharpe_ratio" in sensitivity:
+        sensitivity_span = sensitivity["sharpe_ratio"].max() - sensitivity["sharpe_ratio"].min()
+    best_ml = (
+        ml_diagnostics.sort_values("test_rmse").iloc[0]
+        if not ml_diagnostics.empty and "test_rmse" in ml_diagnostics
+        else pd.Series(dtype=float)
+    )
 
     lines = [
         "# Key Findings",
@@ -330,7 +405,15 @@ def _save_key_findings(
         f"{_format_percent(mean_reversion_stress_drawdown)}.",
         "- Fama-French alpha uses official Kenneth French factors and Newey-West HAC standard errors: "
         f"alpha={_format_number(alpha)}, p-value={_format_number(alpha_p)}.",
+        "- Mean-reversion parameter sensitivity over entry Z-scores -1.5, -2.0, and -2.5: "
+        f"Sharpe range={_format_number(float(sensitivity_span))}.",
     ]
+    if not best_ml.empty:
+        lines.append(
+            "- ML baseline diagnostics: lowest test RMSE model is "
+            f"{best_ml['model']} with test R-squared={_format_number(float(best_ml['test_r2']))} "
+            f"and RMSE={_format_number(float(best_ml['test_rmse']))}."
+        )
     if not best_hedge.empty:
         lines.append(
             "- Delta-hedging cost/error trade-off: best cost-adjusted hedge interval is "
@@ -351,7 +434,7 @@ def main() -> None:
     config = load_config(PROJECT_ROOT / "config.yaml")
     data_config = config.get("data", {})
     backtest_config = config.get("backtest", {})
-    tickers = tuple(config.get("universe", ["NVDA", "MSFT", "AAPL", "GOOGL", "META", "SPY"]))
+    tickers = tuple(config.get("universe", DEFAULT_TICKERS))
 
     market_config = MarketDataConfig(
         tickers=tickers,
@@ -411,6 +494,14 @@ def main() -> None:
             "maximum_drawdown": mean_reversion_stress_drawdown,
         }
     ).to_csv(results_dir / "mean_reversion_2020_stress.csv")
+    sensitivity = _run_parameter_sensitivity(
+        features,
+        engine,
+        benchmark_returns,
+        config,
+        results_dir / "parameter_sensitivity.csv",
+    )
+    ml_diagnostics = _run_ml_research(features, results_dir / "ml_model_comparison.csv")
 
     factors = _load_factor_data(features, config, market_config)
     factors.to_csv(results_dir / "fama_french_factors.csv", index=False)
@@ -425,6 +516,8 @@ def main() -> None:
         turnover,
         mean_reversion_stress_drawdown,
         exposure,
+        sensitivity,
+        ml_diagnostics,
         hedging,
         results_dir / "key_findings.md",
     )

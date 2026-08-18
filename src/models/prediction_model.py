@@ -52,13 +52,17 @@ def create_supervised_dataset(
 
     features = DEFAULT_FEATURE_COLUMNS if feature_columns is None else feature_columns
     frame = feature_data.copy()
+    if {"date", "ticker"}.issubset(frame.columns):
+        frame["date"] = pd.to_datetime(frame["date"])
+        frame = frame.sort_values(["date", "ticker"]).reset_index(drop=True)
     for column in features:
         if column not in frame.columns:
             frame[column] = np.nan
     if target_column not in frame.columns:
         raise ValueError(f"missing target column: {target_column}")
 
-    model_frame = frame[features + [target_column]].replace([np.inf, -np.inf], np.nan).dropna()
+    model_frame = frame[features + [target_column]].replace([np.inf, -np.inf], np.nan)
+    model_frame = model_frame.dropna(subset=[target_column])
     if model_frame.empty:
         raise ValueError("no complete rows available for supervised learning")
     return model_frame[features], model_frame[target_column]
@@ -81,25 +85,48 @@ def chronological_train_test_split(
 
 def _model_specs(random_state: int) -> dict[str, Any]:
     from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+    from sklearn.impute import SimpleImputer
     from sklearn.linear_model import LinearRegression
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
 
     return {
-        "linear_regression": Pipeline([("scale", StandardScaler()), ("model", LinearRegression())]),
-        "random_forest": RandomForestRegressor(
-            n_estimators=200,
-            max_depth=5,
-            min_samples_leaf=10,
-            random_state=random_state,
-            n_jobs=-1,
+        "linear_regression": Pipeline(
+            [
+                ("impute", SimpleImputer(strategy="median")),
+                ("scale", StandardScaler()),
+                ("model", LinearRegression()),
+            ]
         ),
-        "gradient_boosting": GradientBoostingRegressor(
-            n_estimators=200,
-            learning_rate=0.03,
-            max_depth=2,
-            min_samples_leaf=10,
-            random_state=random_state,
+        "random_forest": Pipeline(
+            [
+                ("impute", SimpleImputer(strategy="median")),
+                (
+                    "model",
+                    RandomForestRegressor(
+                        n_estimators=200,
+                        max_depth=5,
+                        min_samples_leaf=10,
+                        random_state=random_state,
+                        n_jobs=-1,
+                    ),
+                ),
+            ]
+        ),
+        "gradient_boosting": Pipeline(
+            [
+                ("impute", SimpleImputer(strategy="median")),
+                (
+                    "model",
+                    GradientBoostingRegressor(
+                        n_estimators=200,
+                        learning_rate=0.03,
+                        max_depth=2,
+                        min_samples_leaf=10,
+                        random_state=random_state,
+                    ),
+                ),
+            ]
         ),
     }
 

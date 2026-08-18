@@ -78,3 +78,34 @@ def test_supervised_dataset_and_chronological_split() -> None:
     assert len(x_train) == len(y_train)
     assert len(x_test) == len(y_test)
     assert x_train.index.max() < x_test.index.min()
+
+
+def test_supervised_dataset_sorts_by_date_when_available() -> None:
+    frame = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-03", "2026-01-01", "2026-01-02"]),
+            "ticker": ["AAPL", "AAPL", "AAPL"],
+            "daily_return": [0.03, 0.01, 0.02],
+            "volatility_21d": [0.3, 0.1, 0.2],
+            "future_21d_return": [0.3, 0.1, 0.2],
+        }
+    )
+    x, y = create_supervised_dataset(frame, feature_columns=["daily_return", "volatility_21d"])
+
+    assert list(x["daily_return"]) == [0.01, 0.02, 0.03]
+    assert list(y) == [0.1, 0.2, 0.3]
+
+
+def test_supervised_dataset_keeps_missing_features_for_pipeline_imputation() -> None:
+    frame = pd.DataFrame(
+        {
+            "daily_return": [0.01, np.nan, 0.03],
+            "volatility_21d": [0.1, 0.2, 0.3],
+            "future_21d_return": [0.02, 0.01, np.nan],
+        }
+    )
+    x, y = create_supervised_dataset(frame, feature_columns=["daily_return", "volatility_21d"])
+
+    assert len(x) == 2
+    assert x["daily_return"].isna().sum() == 1
+    assert len(y) == 2

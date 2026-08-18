@@ -35,11 +35,12 @@ The project includes data processing, technical indicators, signal generation, p
 - Delta-hedging replication error analysis
 - ARIMA time-series forecasting
 - Linear Regression, Random Forest, and Gradient Boosting return prediction
+- Parameter sensitivity analysis for mean-reversion thresholds
 
 ## Existing Problems
 
 - yfinance fundamentals are not point-in-time historical fundamentals.
-- The equity universe is small and not survivorship-bias-free.
+- The equity universe is selected ex post from current large-cap U.S. equities. It is broader than the original five-stock prototype but remains non-point-in-time and not survivorship-bias-free.
 - C++ engine is currently standalone and not bound into Python.
 - Real result files are generated only after data download and execution.
 - GitHub remote publishing requires either `gh` CLI or repository access through the GitHub app.
@@ -47,6 +48,7 @@ The project includes data processing, technical indicators, signal generation, p
 ## Recommended Improvements
 
 - Add point-in-time fundamentals from a professional data source.
+- Replace the current ex-post universe with historical index membership data.
 - Add pybind11 bindings between Python and C++.
 - Add walk-forward strategy parameter validation.
 - Add CI coverage for C++ compilation.
