@@ -506,7 +506,7 @@ results/delta_hedging_frequency.png
 
 ## Research Dashboard
 
-The Streamlit dashboard provides a browser interface for the same research framework:
+The Streamlit dashboard provides a Chinese browser interface for the same research framework:
 
 - search tickers, strategies, metrics, factors, and derivative concepts
 - inspect processed stock features and technical indicators
@@ -517,6 +517,14 @@ The Streamlit dashboard provides a browser interface for the same research frame
 - inspect saved delta-hedging frequency results
 
 The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible.
+
+Local access through `http://127.0.0.1:8501` only works on the machine running Streamlit. To let other users open the dashboard directly, deploy the repository to Streamlit Community Cloud or another Python app host and set `app.py` as the entry point. On Streamlit Cloud, the public URL can be renamed through the app slug, for example:
+
+```text
+quant-research-terminal.streamlit.app
+```
+
+A custom domain can be used only after deploying the app to a hosting provider that supports domain binding.
 
 ## Configuration
 
