@@ -510,12 +510,13 @@ The Streamlit dashboard provides a browser interface for the same research frame
 
 - search tickers, strategies, metrics, factors, and derivative concepts
 - inspect processed stock features and technical indicators
+- download an external Yahoo Finance ticker on demand from the stock explorer
 - run strategy backtests on the processed feature dataset
 - review risk summaries, factor exposures, parameter sensitivity, and ML diagnostics
 - price European options with Black-Scholes, binomial tree, and Monte Carlo methods
 - inspect saved delta-hedging frequency results
 
-The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator and search interface before the full research pipeline has been executed.
+The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible.
 
 ## Configuration
 

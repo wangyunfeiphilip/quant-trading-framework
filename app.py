@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 import sys
 
@@ -16,7 +17,13 @@ sys.path.insert(0, str(SRC_ROOT))
 
 from backtesting.engine import BacktestEngine
 from dashboard.search import build_search_index, search_catalog
-from data.data_loader import DEFAULT_TICKERS
+from data.data_loader import (
+    DEFAULT_TICKERS,
+    clean_price_data,
+    create_feature_dataset,
+    download_price_data,
+    load_fundamental_features,
+)
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
 from derivatives.numerical_methods import binomial_option_price, monte_carlo_option_price
 from risk.risk_metrics import maximum_drawdown, performance_summary
@@ -69,15 +76,20 @@ def read_csv(signature: tuple[str, float, int]) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_config_tickers() -> list[str]:
+def load_dashboard_config() -> dict:
     try:
         import yaml
 
-        config = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text()) or {}
-        tickers = config.get("universe") or list(DEFAULT_TICKERS)
-        return [str(ticker).upper() for ticker in tickers]
+        return yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text()) or {}
     except Exception:
-        return list(DEFAULT_TICKERS)
+        return {}
+
+
+@st.cache_data(show_spinner=False)
+def load_config_tickers() -> list[str]:
+    config = load_dashboard_config()
+    tickers = config.get("universe") or list(DEFAULT_TICKERS)
+    return [str(ticker).upper() for ticker in tickers]
 
 
 @st.cache_data(show_spinner=False)
@@ -87,6 +99,23 @@ def load_features() -> pd.DataFrame:
         return frame
     frame["date"] = pd.to_datetime(frame["date"])
     return frame.sort_values(["date", "ticker"]).reset_index(drop=True)
+
+
+def normalize_ticker(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9.^=-]", "", value).upper()
+
+
+@st.cache_data(show_spinner=True)
+def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
+    raw = download_price_data([ticker], start=start, end=end, raw_dir=None)
+    if raw.empty:
+        return pd.DataFrame()
+
+    clean = clean_price_data(raw)
+    fundamentals = load_fundamental_features([ticker])
+    features = create_feature_dataset(clean, fundamentals=fundamentals)
+    features["date"] = pd.to_datetime(features["date"])
+    return features.sort_values(["date", "ticker"]).reset_index(drop=True)
 
 
 @st.cache_data(show_spinner=False)
@@ -136,7 +165,13 @@ def render_search(query: str, tickers: list[str]) -> None:
     st.subheader("Search Results")
     results = search_catalog(query, build_search_index(tickers))
     if not results:
-        st.write("No direct matches.")
+        candidate = normalize_ticker(query)
+        if 1 <= len(candidate) <= 12:
+            st.write(
+                f"No direct matches. To inspect `{candidate}`, open Stock Explorer and use the external ticker lookup."
+            )
+        else:
+            st.write("No direct matches.")
         return
     for item in results:
         with st.container(border=True):
@@ -174,16 +209,38 @@ def render_overview() -> None:
 def render_stock_explorer(tickers: list[str]) -> None:
     st.header("Stock Explorer")
     features = load_features()
-    ticker = st.selectbox("Ticker", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
+    config = load_dashboard_config()
+    data_config = config.get("data", {})
+    start = data_config.get("start", "2015-01-01")
+    end = data_config.get("end", "2026-12-31")
 
     if features.empty:
         render_missing_results()
         return
 
-    stock = features[features["ticker"].eq(ticker)].copy()
+    col1, col2 = st.columns([1, 2])
+    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
+    external = normalize_ticker(
+        col2.text_input(
+            "External Ticker Lookup",
+            placeholder="Type any Yahoo Finance ticker, e.g. PLTR, TSM, BABA, 0700.HK",
+        )
+    )
+    ticker = external or selected
+    use_external = bool(external and external not in set(tickers))
+
+    if use_external:
+        with st.spinner(f"Downloading {ticker} from yfinance and building indicators..."):
+            stock = load_external_ticker_features(ticker, start=start, end=end)
+        source_label = "live yfinance lookup"
+    else:
+        stock = features[features["ticker"].eq(ticker)].copy()
+        source_label = "processed project dataset"
+
     if stock.empty:
-        st.warning(f"No processed data for {ticker}.")
+        st.warning(f"No market data found for {ticker}. Check the ticker symbol and try again.")
         return
+    st.caption(f"Data source: {source_label}. Date range: {stock['date'].min().date()} to {stock['date'].max().date()}.")
 
     latest = stock.dropna(subset=["adjusted_close"]).iloc[-1]
     returns = pd.to_numeric(stock["daily_return"], errors="coerce").dropna()
