@@ -51,11 +51,20 @@ st.markdown(
 )
 
 
-@st.cache_data(show_spinner=False)
-def read_csv(path: str) -> pd.DataFrame:
+def file_signature(path: str | Path) -> tuple[str, float, int]:
     file_path = Path(path)
     if not file_path.exists():
+        return str(file_path), 0.0, 0
+    stat = file_path.stat()
+    return str(file_path), stat.st_mtime, stat.st_size
+
+
+@st.cache_data(show_spinner=False)
+def read_csv(signature: tuple[str, float, int]) -> pd.DataFrame:
+    path, _, size = signature
+    if size == 0:
         return pd.DataFrame()
+    file_path = Path(path)
     return pd.read_csv(file_path)
 
 
@@ -73,7 +82,7 @@ def load_config_tickers() -> list[str]:
 
 @st.cache_data(show_spinner=False)
 def load_features() -> pd.DataFrame:
-    frame = read_csv(str(PROCESSED_DIR / "feature_dataset.csv"))
+    frame = read_csv(file_signature(PROCESSED_DIR / "feature_dataset.csv"))
     if frame.empty:
         return frame
     frame["date"] = pd.to_datetime(frame["date"])
@@ -82,7 +91,7 @@ def load_features() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_portfolio_value() -> pd.DataFrame:
-    frame = read_csv(str(RESULTS_DIR / "portfolio_value.csv"))
+    frame = read_csv(file_signature(RESULTS_DIR / "portfolio_value.csv"))
     if frame.empty:
         return frame
     frame["date"] = pd.to_datetime(frame["date"])
@@ -142,7 +151,7 @@ def render_overview() -> None:
     st.caption("Equity strategies, factor models, derivatives pricing, and hedging research")
 
     portfolio = load_portfolio_value()
-    performance = read_csv(str(RESULTS_DIR / "performance_summary.csv"))
+    performance = read_csv(file_signature(RESULTS_DIR / "performance_summary.csv"))
 
     if not performance.empty:
         summary = performance.iloc[:, 0] if performance.shape[1] == 1 else performance.set_index(performance.columns[0]).iloc[:, 0]
@@ -155,7 +164,7 @@ def render_overview() -> None:
         render_missing_results()
 
     if not portfolio.empty and "total_value" in portfolio:
-        st.plotly_chart(line_chart(portfolio, "date", "total_value", "Portfolio Value"), use_container_width=True)
+        st.plotly_chart(line_chart(portfolio, "date", "total_value", "Portfolio Value"), width="stretch")
 
     findings = load_key_findings()
     if findings:
@@ -193,7 +202,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
     if "sma_60" in stock:
         fig.add_trace(go.Scatter(x=stock["date"], y=stock["sma_60"], mode="lines", name="SMA 60"))
     fig.update_layout(title=f"{ticker} Price and Moving Averages", height=440, margin=dict(l=20, r=20, t=55, b=20))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     indicator_cols = [
         "daily_return",
@@ -207,7 +216,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
         "return_126d",
     ]
     shown = [column for column in indicator_cols if column in stock.columns]
-    st.dataframe(stock[["date", "ticker", *shown]].tail(30), use_container_width=True, hide_index=True)
+    st.dataframe(stock[["date", "ticker", *shown]].tail(30), width="stretch", hide_index=True)
 
 
 def strategy_weights(features: pd.DataFrame, strategy: str, top_n: int, entry_z: float) -> pd.DataFrame:
@@ -253,15 +262,15 @@ def render_backtest_lab() -> None:
     col3.metric("Sharpe Ratio", f"{summary.get('sharpe_ratio', np.nan):.3f}")
     col4.metric("Max Drawdown", percent_value(summary.get("maximum_drawdown")))
 
-    st.plotly_chart(line_chart(result.portfolio_value, "date", "total_value", f"{strategy} Backtest"), use_container_width=True)
-    st.dataframe(result.trades.tail(50), use_container_width=True, hide_index=True)
+    st.plotly_chart(line_chart(result.portfolio_value, "date", "total_value", f"{strategy} Backtest"), width="stretch")
+    st.dataframe(result.trades.tail(50), width="stretch", hide_index=True)
 
 
 def render_risk_factors() -> None:
     st.header("Risk & Factors")
-    performance = read_csv(str(RESULTS_DIR / "performance_summary.csv"))
-    exposure = read_csv(str(RESULTS_DIR / "factor_exposure.csv"))
-    sensitivity = read_csv(str(RESULTS_DIR / "parameter_sensitivity.csv"))
+    performance = read_csv(file_signature(RESULTS_DIR / "performance_summary.csv"))
+    exposure = read_csv(file_signature(RESULTS_DIR / "factor_exposure.csv"))
+    sensitivity = read_csv(file_signature(RESULTS_DIR / "parameter_sensitivity.csv"))
 
     col1, col2 = st.columns(2)
     with col1:
@@ -269,37 +278,37 @@ def render_risk_factors() -> None:
         if performance.empty:
             render_missing_results()
         else:
-            st.dataframe(performance, use_container_width=True)
+            st.dataframe(performance, width="stretch")
     with col2:
         st.subheader("Factor Exposure")
         if exposure.empty:
             render_missing_results()
         else:
-            st.dataframe(exposure, use_container_width=True)
+            st.dataframe(exposure, width="stretch")
 
     st.subheader("Parameter Sensitivity")
     if sensitivity.empty:
         render_missing_results()
     else:
-        st.dataframe(sensitivity, use_container_width=True, hide_index=True)
+        st.dataframe(sensitivity, width="stretch", hide_index=True)
 
 
 def render_data_ml() -> None:
     st.header("Data & ML")
-    quality = read_csv(str(RESULTS_DIR / "data_quality_report.csv"))
-    ml = read_csv(str(RESULTS_DIR / "ml_model_comparison.csv"))
+    quality = read_csv(file_signature(RESULTS_DIR / "data_quality_report.csv"))
+    ml = read_csv(file_signature(RESULTS_DIR / "ml_model_comparison.csv"))
 
     st.subheader("Data Quality")
     if quality.empty:
         render_missing_results()
     else:
-        st.dataframe(quality, use_container_width=True, hide_index=True)
+        st.dataframe(quality, width="stretch", hide_index=True)
 
     st.subheader("Machine Learning Baselines")
     if ml.empty:
         render_missing_results()
     else:
-        st.dataframe(ml, use_container_width=True, hide_index=True)
+        st.dataframe(ml, width="stretch", hide_index=True)
 
 
 def render_derivatives_lab() -> None:
@@ -337,23 +346,23 @@ def render_derivatives_lab() -> None:
     st.subheader("Greeks")
     greek_frame = pd.DataFrame([greeks]).T.reset_index()
     greek_frame.columns = ["Greek", "Value"]
-    st.dataframe(greek_frame, use_container_width=True, hide_index=True)
+    st.dataframe(greek_frame, width="stretch", hide_index=True)
 
-    pricing = read_csv(str(RESULTS_DIR / "derivative_pricing_comparison.csv"))
-    hedging = read_csv(str(RESULTS_DIR / "delta_hedging_frequency.csv"))
+    pricing = read_csv(file_signature(RESULTS_DIR / "derivative_pricing_comparison.csv"))
+    hedging = read_csv(file_signature(RESULTS_DIR / "delta_hedging_frequency.csv"))
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Saved Pricing Comparison")
         if pricing.empty:
             render_missing_results()
         else:
-            st.dataframe(pricing, use_container_width=True, hide_index=True)
+            st.dataframe(pricing, width="stretch", hide_index=True)
     with col_right:
         st.subheader("Saved Hedge Frequency")
         if hedging.empty:
             render_missing_results()
         else:
-            st.dataframe(hedging, use_container_width=True, hide_index=True)
+            st.dataframe(hedging, width="stretch", hide_index=True)
 
 
 def main() -> None:
