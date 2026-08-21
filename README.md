@@ -436,6 +436,8 @@ data/raw/fama_french_daily_factors.csv
 Installation:
 
 ```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -444,6 +446,22 @@ Run the full research pipeline:
 ```bash
 python main.py
 ```
+
+Launch the local research dashboard:
+
+```bash
+streamlit run app.py
+```
+
+Open the local URL printed by Streamlit, usually:
+
+```text
+http://localhost:8501
+```
+
+The dashboard can open before the research pipeline is run, but the stock explorer,
+backtest, risk, factor, and ML pages use the generated files from `data/processed/`
+and `results/`. Run `python main.py` first when you want the full dashboard populated.
 
 Run tests:
 
@@ -485,6 +503,19 @@ results/monte_carlo_convergence.png
 results/delta_hedging_frequency.csv
 results/delta_hedging_frequency.png
 ```
+
+## Research Dashboard
+
+The Streamlit dashboard provides a browser interface for the same research framework:
+
+- search tickers, strategies, metrics, factors, and derivative concepts
+- inspect processed stock features and technical indicators
+- run strategy backtests on the processed feature dataset
+- review risk summaries, factor exposures, parameter sensitivity, and ML diagnostics
+- price European options with Black-Scholes, binomial tree, and Monte Carlo methods
+- inspect saved delta-hedging frequency results
+
+The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator and search interface before the full research pipeline has been executed.
 
 ## Configuration
 
