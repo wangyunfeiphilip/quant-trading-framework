@@ -35,6 +35,7 @@ from strategies.momentum import generate_momentum_weights
 RESULTS_DIR = PROJECT_ROOT / "results"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 INVESTMENT_RESULTS_DIR = RESULTS_DIR / "investment_platform"
+DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
 
 
 st.set_page_config(
@@ -108,8 +109,19 @@ st.markdown(
 )
 
 
-def file_signature(path: str | Path) -> tuple[str, float, int]:
+def resolve_data_path(path: str | Path) -> Path:
     file_path = Path(path)
+    if file_path.exists():
+        return file_path
+    try:
+        fallback = DEMO_DATA_DIR / file_path.relative_to(PROJECT_ROOT)
+    except ValueError:
+        fallback = file_path
+    return fallback if fallback.exists() else file_path
+
+
+def file_signature(path: str | Path) -> tuple[str, float, int]:
+    file_path = resolve_data_path(path)
     if not file_path.exists():
         return str(file_path), 0.0, 0
     stat = file_path.stat()
@@ -179,7 +191,7 @@ def load_portfolio_value() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_key_findings() -> str:
-    path = RESULTS_DIR / "key_findings.md"
+    path = resolve_data_path(RESULTS_DIR / "key_findings.md")
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
@@ -671,13 +683,13 @@ def main() -> None:
     render_search(query, tickers)
 
     pages = {
-        "AI 投资研究台": render_ai_investment_platform,
         "研究概览": render_overview,
         "股票浏览器": lambda: render_stock_explorer(tickers),
         "回测实验室": render_backtest_lab,
         "风险与因子": render_risk_factors,
         "数据与机器学习": render_data_ml,
         "衍生品实验室": render_derivatives_lab,
+        "AI 投资研究台": render_ai_investment_platform,
     }
     selected = st.sidebar.radio("工作区", list(pages.keys()))
     pages[selected]()

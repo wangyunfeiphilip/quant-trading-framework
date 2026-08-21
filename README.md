@@ -462,6 +462,8 @@ http://localhost:8501
 The dashboard can open before the research pipeline is run, but the stock explorer,
 backtest, risk, factor, and ML pages use the generated files from `data/processed/`
 and `results/`. Run `python main.py` first when you want the full dashboard populated.
+When those generated files are not available in a cloud demo, the app falls back
+to the lightweight `demo_data/` snapshot.
 
 Run tests:
 
@@ -525,6 +527,12 @@ quant-research-terminal.streamlit.app
 ```
 
 A custom domain can be used only after deploying the app to a hosting provider that supports domain binding.
+
+Deployment documentation:
+
+```text
+docs/deployment.md
+```
 
 ## Configuration
 
