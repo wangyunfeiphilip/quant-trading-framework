@@ -164,7 +164,13 @@ def load_features() -> pd.DataFrame:
 
 
 def normalize_ticker(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9.^=-]", "", value).upper()
+    ticker = re.sub(r"[^A-Za-z0-9.^=-]", "", value).upper()
+    if re.fullmatch(r"\d{6}", ticker):
+        if ticker.startswith(("000", "001", "002", "003", "200", "300", "301")):
+            return f"{ticker}.SZ"
+        if ticker.startswith(("600", "601", "603", "605", "688", "689", "900")):
+            return f"{ticker}.SS"
+    return ticker
 
 
 @st.cache_data(show_spinner=True, ttl=3600)
@@ -446,7 +452,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
     external = normalize_ticker(
         col2.text_input(
             "外部股票查询",
-            placeholder="输入任意 Yahoo Finance 代码，例如 PLTR、TSM、BABA、0700.HK",
+            placeholder="输入 Yahoo Finance 代码，例如 PLTR、TSM、BABA、0700.HK、301321",
         )
     )
     refresh_external = col3.button("刷新", disabled=not bool(external))
@@ -462,7 +468,10 @@ def render_stock_explorer(tickers: list[str]) -> None:
                 stock = load_external_ticker_features(ticker, start=start, end=end)
         except Exception as exc:
             st.error(f"无法下载 {ticker}：{exc}")
-            st.caption("Yahoo Finance 偶尔会限流或中断连接。稍等几十秒后点击「刷新」。")
+            st.caption(
+                "Yahoo Finance 偶尔会限流或中断连接。A 股代码会自动补 `.SZ` 或 `.SS` 后缀；"
+                "港股仍建议输入 `0700.HK` 这类完整代码。"
+            )
             return
         source_label = "实时 yfinance 查询"
     else:
