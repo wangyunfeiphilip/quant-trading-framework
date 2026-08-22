@@ -18,6 +18,7 @@ sys.path.insert(0, str(SRC_ROOT))
 
 from backtesting.engine import BacktestEngine
 from dashboard.search import build_search_index, search_catalog
+from dashboard.technical_summary import generate_technical_summary
 from data.data_loader import (
     DEFAULT_TICKERS,
     clean_price_data,
@@ -492,6 +493,13 @@ def render_stock_explorer(tickers: list[str]) -> None:
     col2.metric("21 日收益", percent_value(latest.get("return_21d")))
     col3.metric("126 日收益", percent_value(latest.get("return_126d")))
     col4.metric("最大回撤", percent_value(max_dd))
+
+    summary = generate_technical_summary(latest)
+    st.subheader("技术指标结论")
+    st.markdown(f"**综合判断：{summary.stance}。** {summary.headline}")
+    for item in summary.bullets:
+        st.markdown(f"- {item}")
+    st.caption("以上为基于最新一日技术指标的研究型解读，不构成投资建议。")
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=stock["date"], y=stock["adjusted_close"], mode="lines", name="复权收盘价"))
