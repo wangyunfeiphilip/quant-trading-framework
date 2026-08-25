@@ -19,8 +19,8 @@ def test_technical_summary_detects_bullish_alignment() -> None:
         }
     )
 
-    assert summary.stance == "偏多"
-    assert any("多头排列" in item for item in summary.bullets)
+    assert summary.stance == "Bullish"
+    assert any("bullish" in item.lower() for item in summary.bullets)
 
 
 def test_technical_summary_detects_bearish_alignment() -> None:
@@ -41,5 +41,5 @@ def test_technical_summary_detects_bearish_alignment() -> None:
         }
     )
 
-    assert summary.stance == "偏空"
-    assert any("空头排列" in item for item in summary.bullets)
+    assert summary.stance == "Bearish"
+    assert any("bearish" in item.lower() for item in summary.bullets)

@@ -41,7 +41,7 @@ DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
 
 
 st.set_page_config(
-    page_title="量化研究终端",
+    page_title="Quant Research Terminal",
     page_icon="Q",
     layout="wide",
 )
@@ -113,6 +113,216 @@ st.markdown(
         margin-bottom: 16px;
         box-shadow: 0 18px 45px rgba(18, 24, 33, 0.08);
         animation: liftIn 320ms ease both;
+    }
+    .home-hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(118, 255, 231, 0.22);
+        border-radius: 14px;
+        padding: 34px 34px 28px;
+        margin: 0 0 18px;
+        color: #f5fbff;
+        background:
+            linear-gradient(90deg, rgba(126, 255, 229, 0.08) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(126, 255, 229, 0.06) 1px, transparent 1px),
+            linear-gradient(135deg, #071014 0%, #0b141b 46%, #11120d 100%);
+        background-size: 34px 34px, 34px 34px, auto;
+        box-shadow:
+            0 28px 80px rgba(7, 16, 20, 0.28),
+            inset 0 0 0 1px rgba(255,255,255,0.04);
+        animation: liftIn 420ms ease both;
+    }
+    .home-hero:before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            repeating-linear-gradient(180deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 7px),
+            linear-gradient(120deg, transparent 0%, rgba(119, 255, 231, 0.10) 44%, transparent 68%);
+        opacity: 0.34;
+        pointer-events: none;
+        animation: scanDrift 8s linear infinite;
+    }
+    @keyframes scanDrift {
+        from { transform: translateY(-24px); }
+        to { transform: translateY(24px); }
+    }
+    .hero-content {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+        gap: 26px;
+        align-items: stretch;
+    }
+    .hero-kicker {
+        color: #7effe5;
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+    .hero-title {
+        color: #ffffff;
+        font-size: clamp(2.25rem, 6vw, 5.25rem);
+        font-weight: 900;
+        line-height: 0.95;
+        max-width: 860px;
+        letter-spacing: 0;
+    }
+    .hero-title span {
+        color: #d6b162;
+    }
+    .hero-copy {
+        color: rgba(245, 251, 255, 0.78);
+        font-size: 1.05rem;
+        line-height: 1.65;
+        max-width: 780px;
+        margin-top: 18px;
+    }
+    .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    .hero-cta,
+    .hero-secondary {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 11px 16px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        text-decoration: none !important;
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+    .hero-cta {
+        color: #05100f !important;
+        background: #7effe5;
+        box-shadow: 0 0 28px rgba(126, 255, 229, 0.36);
+    }
+    .hero-secondary {
+        color: #f5fbff !important;
+        border: 1px solid rgba(245, 251, 255, 0.22);
+        background: rgba(255,255,255,0.06);
+    }
+    .hero-cta:hover,
+    .hero-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 34px rgba(0,0,0,0.24), 0 0 26px rgba(126,255,229,0.22);
+    }
+    .hero-cta:active,
+    .hero-secondary:active,
+    .stButton button:active {
+        transform: translateY(1px) scale(0.985);
+        box-shadow: 0 0 0 7px rgba(126, 255, 229, 0.13);
+    }
+    .hero-panel {
+        border: 1px solid rgba(245, 251, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        padding: 18px;
+        backdrop-filter: blur(12px);
+    }
+    .hero-terminal-line {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 10px;
+        padding: 11px 0;
+        border-bottom: 1px solid rgba(245, 251, 255, 0.10);
+        color: rgba(245, 251, 255, 0.76);
+        font-size: 0.86rem;
+    }
+    .hero-terminal-line:last-child { border-bottom: 0; }
+    .hero-terminal-line strong {
+        color: #7effe5;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+    .hero-metrics {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 26px;
+    }
+    .hero-metric {
+        border: 1px solid rgba(245, 251, 255, 0.13);
+        background: rgba(255, 255, 255, 0.055);
+        border-radius: 10px;
+        padding: 13px 14px;
+        min-height: 86px;
+    }
+    .hero-metric .value {
+        color: #ffffff;
+        font-size: 1.4rem;
+        font-weight: 880;
+    }
+    .hero-metric .label {
+        color: rgba(245,251,255,0.62);
+        font-size: 0.78rem;
+        line-height: 1.35;
+        margin-top: 5px;
+    }
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin: 14px 0 20px;
+    }
+    .feature-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background:
+            linear-gradient(180deg, #ffffff 0%, #f7f9fb 100%);
+        border-radius: 10px;
+        padding: 18px;
+        min-height: 154px;
+        box-shadow: 0 14px 34px rgba(18, 24, 33, 0.07);
+        transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .feature-card:before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, #0b766d, #d6b162);
+    }
+    .feature-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(11, 118, 109, 0.28);
+        box-shadow: 0 22px 44px rgba(18, 24, 33, 0.10);
+    }
+    .feature-card:active {
+        transform: translateY(1px) scale(0.99);
+        box-shadow: 0 0 0 6px rgba(11, 118, 109, 0.10);
+    }
+    .feature-index {
+        color: var(--teal);
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 9px;
+    }
+    .feature-title {
+        color: var(--ink);
+        font-size: 1.04rem;
+        font-weight: 820;
+        margin-bottom: 8px;
+    }
+    .feature-copy {
+        color: var(--muted);
+        line-height: 1.58;
+        font-size: 0.92rem;
     }
     .app-shell-top {
         display: flex;
@@ -311,6 +521,10 @@ st.markdown(
         .system-chips { justify-content: flex-start; min-width: auto; }
         .app-shell { padding: 16px; }
         .terminal-title { padding: 17px; }
+        .hero-content { grid-template-columns: 1fr; }
+        .hero-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .feature-grid { grid-template-columns: 1fr; }
+        .home-hero { padding: 24px 20px; }
     }
     </style>
     """,
@@ -497,7 +711,7 @@ def line_chart(frame: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
 
 
 def render_missing_results() -> None:
-    st.info("尚未找到已生成的研究结果。请先运行 `python main.py`，或使用外部股票查询与衍生品实验室。")
+    st.info("No generated research outputs were found. Run `python main.py`, or use live ticker lookup and the derivatives lab.")
 
 
 def render_page_title(eyebrow: str, title: str, subtitle: str) -> None:
@@ -522,12 +736,12 @@ def render_app_header(ticker_count: int) -> None:
                     <div class="brand-kicker">Quantitative Research Framework</div>
                     <div class="brand-title">Equity Strategies and Derivatives Pricing</div>
                     <div class="brand-subtitle">
-                        面向研究展示的量化工作台：股票策略回测、风险归因、Fama-French 因子模型、
-                        机器学习基线与期权定价实验集中在一个可交互界面。
+                        An interactive research terminal for equity strategy backtesting, risk attribution,
+                        Fama-French factor modeling, machine learning baselines, and derivatives pricing.
                     </div>
                 </div>
                 <div class="system-chips">
-                    <span class="chip chip-teal">{ticker_count} 个研究标的</span>
+                    <span class="chip chip-teal">{ticker_count} research names</span>
                     <span class="chip chip-gold">Signal-lagged backtest</span>
                     <span class="chip">Streamlit Demo</span>
                     <span class="chip">Python / C++</span>
@@ -539,18 +753,95 @@ def render_app_header(ticker_count: int) -> None:
     )
 
 
+def render_home_hero(ticker_count: int) -> None:
+    st.markdown(
+        f"""
+        <section class="home-hero">
+            <div class="hero-content">
+                <div>
+                    <div class="hero-kicker">Research-grade quant lab</div>
+                    <div class="hero-title">Explore markets through <span>models, risk, and motion.</span></div>
+                    <div class="hero-copy">
+                        A public-facing quantitative research terminal that turns raw market data into
+                        strategy backtests, technical signal explanations, factor exposures, machine-learning
+                        diagnostics, and option-pricing experiments.
+                    </div>
+                    <div class="hero-actions">
+                        <a class="hero-cta" href="#stock-explorer">Open the research terminal</a>
+                        <a class="hero-secondary" href="#method-stack">View capability map</a>
+                    </div>
+                </div>
+                <div class="hero-panel">
+                    <div class="hero-terminal-line"><strong>Input</strong><span>OHLCV, adjusted prices, technical features, factor data</span></div>
+                    <div class="hero-terminal-line"><strong>Engine</strong><span>Signal-lagged portfolio simulation with costs and slippage</span></div>
+                    <div class="hero-terminal-line"><strong>Models</strong><span>Fama-French OLS/HAC, ML baselines, Black-Scholes and Monte Carlo</span></div>
+                    <div class="hero-terminal-line"><strong>Output</strong><span>Returns, drawdowns, factor exposure, Greeks, hedge error</span></div>
+                </div>
+            </div>
+            <div class="hero-metrics">
+                <div class="hero-metric"><div class="value">{ticker_count}</div><div class="label">research universe names in the default equity dataset</div></div>
+                <div class="hero-metric"><div class="value">3</div><div class="label">strategy families: momentum, mean reversion, factor investing</div></div>
+                <div class="hero-metric"><div class="value">5</div><div class="label">option Greeks with analytical and numerical pricing checks</div></div>
+                <div class="hero-metric"><div class="value">HAC</div><div class="label">Newey-West robust factor regression standard errors</div></div>
+            </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_capability_grid() -> None:
+    st.markdown(
+        """
+        <div id="method-stack" class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-index">01 / data</div>
+                <div class="feature-title">Market Data Pipeline</div>
+                <div class="feature-copy">Download, clean, adjust, and feature-engineer public equity data for repeatable research workflows.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-index">02 / strategies</div>
+                <div class="feature-title">Backtesting Workbench</div>
+                <div class="feature-copy">Compare momentum, mean-reversion, and factor portfolios with transaction costs, slippage, and signal lag.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-index">03 / risk</div>
+                <div class="feature-title">Risk Attribution</div>
+                <div class="feature-copy">Inspect Sharpe, drawdown, beta, alpha, tracking error, factor exposures, and parameter sensitivity.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-index">04 / intelligence</div>
+                <div class="feature-title">Signal Explanations</div>
+                <div class="feature-copy">Translate RSI, MACD, moving averages, Z-scores, and momentum windows into readable research conclusions.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-index">05 / derivatives</div>
+                <div class="feature-title">Derivatives Lab</div>
+                <div class="feature-copy">Price European options with Black-Scholes, binomial trees, and Monte Carlo variance reduction, then inspect Greeks.</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-index">06 / engineering</div>
+                <div class="feature-title">Hybrid Python/C++ Design</div>
+                <div class="feature-copy">Keep research, statistics, and visualization in Python while reserving C++ components for simulation experiments.</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_signal_card(summary) -> None:
-    tone = {"偏多": "bullish", "偏空": "bearish"}.get(summary.stance, "neutral")
+    tone = {"Bullish": "bullish", "Bearish": "bearish"}.get(summary.stance, "neutral")
     bullets = "".join(f"<li>{escape(item)}</li>" for item in summary.bullets)
     st.markdown(
         f"""
         <div class="signal-panel {tone}">
             <div class="signal-head">
-                <span class="signal-badge">综合判断：{escape(summary.stance)}</span>
+                <span class="signal-badge">Composite stance: {escape(summary.stance)}</span>
                 <span class="signal-headline">{escape(summary.headline)}</span>
             </div>
             <ul>{bullets}</ul>
-            <div class="signal-note">以上为基于最新一日技术指标的研究型解读，不构成投资建议。</div>
+            <div class="signal-note">Research interpretation based on the latest technical indicators. Not investment advice.</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -560,31 +851,34 @@ def render_signal_card(summary) -> None:
 def render_search(query: str, tickers: list[str]) -> None:
     if not query.strip():
         return
-    st.subheader("搜索结果")
+    st.subheader("Search Results")
     results = search_catalog(query, build_search_index(tickers))
     if not results:
         candidate = normalize_ticker(query)
         if 1 <= len(candidate) <= 12:
             st.write(
-                f"没有匹配到项目内条目。若要查看 `{candidate}`，请进入「股票浏览器」并使用外部股票查询。"
+                f"No internal catalog item matched. To inspect `{candidate}`, open Stock Explorer and use live ticker lookup."
             )
         else:
-            st.write("没有匹配结果。")
+            st.write("No matching results.")
         return
     for item in results:
         with st.container(border=True):
             st.caption(item.category)
             st.write(f"**{item.title}**")
             st.write(item.description)
-            st.caption(f"打开位置：{item.target}")
+            st.caption(f"Open: {item.target}")
 
 
 def render_overview() -> None:
+    tickers = load_config_tickers()
+    render_home_hero(len(tickers))
     render_page_title(
         "Research Overview",
-        "量化研究框架总览",
-        "股票策略、因子模型、衍生品定价、风险归因与动态对冲研究。",
+        "What This Terminal Does",
+        "A portfolio-grade research interface for equities, factor models, derivatives, and risk attribution.",
     )
+    render_capability_grid()
 
     portfolio = load_portfolio_value()
     performance = read_csv(file_signature(RESULTS_DIR / "performance_summary.csv"))
@@ -592,15 +886,15 @@ def render_overview() -> None:
     if not performance.empty:
         summary = performance.iloc[:, 0] if performance.shape[1] == 1 else performance.set_index(performance.columns[0]).iloc[:, 0]
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("累计收益", metric_value(summary, "cumulative_return"))
-        col2.metric("夏普比率", metric_value(summary, "sharpe_ratio"))
-        col3.metric("最大回撤", metric_value(summary, "maximum_drawdown"))
+        col1.metric("Cumulative Return", metric_value(summary, "cumulative_return"))
+        col2.metric("Sharpe Ratio", metric_value(summary, "sharpe_ratio"))
+        col3.metric("Maximum Drawdown", metric_value(summary, "maximum_drawdown"))
         col4.metric("Beta vs SPY", metric_value(summary, "beta_vs_benchmark"))
     else:
         render_missing_results()
 
     if not portfolio.empty and "total_value" in portfolio:
-        st.plotly_chart(line_chart(portfolio, "date", "total_value", "组合净值曲线"), width="stretch")
+        st.plotly_chart(line_chart(portfolio, "date", "total_value", "Portfolio Equity Curve"), width="stretch")
 
     findings = load_key_findings()
     if findings:
@@ -610,14 +904,14 @@ def render_overview() -> None:
 def render_ai_investment_platform() -> None:
     render_page_title(
         "AI Equity Research",
-        "AI 投资研究台",
-        "个人股票研究、投资假设跟踪、因子评分、估值、仓位风险与交易行为反馈。",
+        "AI Investment Research Desk",
+        "Single-name research, thesis tracking, factor scoring, valuation, position risk, and behavior feedback.",
     )
 
     snapshot_path = latest_investment_snapshot_path()
     snapshot = load_investment_snapshot(file_signature(snapshot_path))
     if not snapshot:
-        st.info("尚未找到 AI 投资研究快照。请先运行 `python3 scripts/run_investment_platform.py --config investment_platform.json`。")
+        st.info("No AI investment research snapshot was found. Run `python3 scripts/run_investment_platform.py --config investment_platform.json` first.")
         return
 
     regime = snapshot.get("market_regime", {})
@@ -632,12 +926,12 @@ def render_ai_investment_platform() -> None:
     integrations = pd.DataFrame(snapshot.get("integrations", []))
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("市场状态", regime.get("name", "NA"))
-    col2.metric("状态置信度", percent_value(float(regime.get("confidence", 0.0))))
-    col3.metric("预测命中率", percent_value(float(prediction_summary.get("accuracy", 0.0))))
-    col4.metric("已评估预测数", str(int(prediction_summary.get("evaluated", 0))))
+    col1.metric("Market Regime", regime.get("name", "NA"))
+    col2.metric("Regime Confidence", percent_value(float(regime.get("confidence", 0.0))))
+    col3.metric("Prediction Accuracy", percent_value(float(prediction_summary.get("accuracy", 0.0))))
+    col4.metric("Evaluated Forecasts", str(int(prediction_summary.get("evaluated", 0))))
 
-    st.subheader("动态因子权重")
+    st.subheader("Dynamic Factor Weights")
     weight_cols = ["growth", "quality", "momentum", "value", "risk"]
     weight_values = [float(weights.get(column, 0.0)) for column in weight_cols]
     fig = go.Figure(data=[go.Bar(x=[item.title() for item in weight_cols], y=weight_values)])
@@ -647,23 +941,23 @@ def render_ai_investment_platform() -> None:
 
     left, right = st.columns([3, 2])
     with left:
-        st.subheader("股票综合排名")
+        st.subheader("Composite Stock Ranking")
         if scores.empty:
             render_missing_results()
         else:
             shown = scores[["ticker", "total_score", "factor_scores", "explanation"]].copy()
             st.dataframe(shown, width="stretch", hide_index=True)
     with right:
-        st.subheader("市场驱动因素")
+        st.subheader("Market Drivers")
         for driver in regime.get("drivers", []):
             st.write(f"- {driver}")
         cautions = regime.get("cautions", [])
         if cautions:
-            st.subheader("风险提示")
+            st.subheader("Risk Alerts")
             for caution in cautions:
                 st.write(f"- {caution}")
 
-    st.subheader("投资假设跟踪")
+    st.subheader("Investment Thesis Tracking")
     if theses.empty:
         render_missing_results()
     else:
@@ -671,13 +965,13 @@ def render_ai_investment_platform() -> None:
 
     col_left, col_right = st.columns(2)
     with col_left:
-        st.subheader("情景估值")
+        st.subheader("Scenario Valuation")
         if valuations.empty:
             render_missing_results()
         else:
             st.dataframe(valuations[["ticker", "weighted_fair_value", "upside_to_price"]], width="stretch", hide_index=True)
     with col_right:
-        st.subheader("仓位建议")
+        st.subheader("Position Suggestions")
         if sizing.empty:
             render_missing_results()
         else:
@@ -685,13 +979,13 @@ def render_ai_investment_platform() -> None:
 
     col_left, col_right = st.columns(2)
     with col_left:
-        st.subheader("市场情绪")
+        st.subheader("Market Sentiment")
         if sentiment.empty:
             render_missing_results()
         else:
             st.dataframe(sentiment[["ticker", "label", "speculation_risk", "reasons"]], width="stretch", hide_index=True)
     with col_right:
-        st.subheader("个人交易行为提示")
+        st.subheader("Personal Trading Behavior Notes")
         if behaviors:
             for item in behaviors:
                 with st.container(border=True):
@@ -700,9 +994,9 @@ def render_ai_investment_platform() -> None:
                     st.write(item.get("evidence", ""))
                     st.write(item.get("reminder", ""))
         else:
-            st.write("暂未触发明显行为偏差提示。")
+            st.write("No clear behavioral bias alerts were triggered.")
 
-    st.subheader("开源引擎状态")
+    st.subheader("Open-Source Engine Status")
     if integrations.empty:
         render_missing_results()
     else:
@@ -711,15 +1005,15 @@ def render_ai_investment_platform() -> None:
     report_path = latest_investment_report_path(snapshot)
     report = load_latest_investment_report(file_signature(report_path))
     if report:
-        with st.expander("最新研究日报", expanded=False):
+        with st.expander("Latest Research Report", expanded=False):
             st.markdown(report)
 
 
 def render_stock_explorer(tickers: list[str]) -> None:
     render_page_title(
         "Single Name Explorer",
-        "股票浏览器",
-        "查看项目股票池或任意 Yahoo Finance 股票代码的价格、技术指标、收益率与风险特征。",
+        "Stock Explorer",
+        "Inspect prices, technical indicators, return windows, and risk characteristics for project tickers or any Yahoo Finance symbol.",
     )
     features = load_features()
     config = load_dashboard_config()
@@ -732,14 +1026,14 @@ def render_stock_explorer(tickers: list[str]) -> None:
         return
 
     col1, col2, col3 = st.columns([1, 2, 0.6])
-    selected = col1.selectbox("项目股票池", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
+    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
     external = normalize_ticker(
         col2.text_input(
-            "外部股票查询",
-            placeholder="输入 Yahoo Finance 代码，例如 PLTR、TSM、BABA、0700.HK、301321",
+            "Live Ticker Lookup",
+            placeholder="Enter a Yahoo Finance symbol, e.g. PLTR, TSM, BABA, 0700.HK, 301321",
         )
     )
-    refresh_external = col3.button("刷新", disabled=not bool(external))
+    refresh_external = col3.button("Refresh", disabled=not bool(external))
     if refresh_external:
         load_external_ticker_features.clear()
 
@@ -748,37 +1042,37 @@ def render_stock_explorer(tickers: list[str]) -> None:
 
     if use_external:
         try:
-            with st.spinner(f"正在从 yfinance 下载 {ticker} 并计算指标..."):
+            with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
                 stock = load_external_ticker_features(ticker, start=start, end=end)
         except Exception as exc:
-            st.error(f"无法下载 {ticker}：{exc}")
+            st.error(f"Unable to download {ticker}: {exc}")
             st.caption(
-                "Yahoo Finance 偶尔会限流或中断连接。A 股代码会自动补 `.SZ` 或 `.SS` 后缀；"
-                "港股仍建议输入 `0700.HK` 这类完整代码。"
+                "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
+                "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
             )
             return
-        source_label = "实时 yfinance 查询"
+        source_label = "Live yfinance lookup"
     else:
         stock = features[features["ticker"].eq(ticker)].copy()
-        source_label = "项目已处理数据集"
+        source_label = "Processed project dataset"
 
     if stock.empty:
-        st.warning(f"没有找到 {ticker} 的市场数据。请检查股票代码后重试。")
+        st.warning(f"No market data was found for {ticker}. Check the ticker symbol and try again.")
         return
-    st.caption(f"数据来源：{source_label}。时间范围：{stock['date'].min().date()} 至 {stock['date'].max().date()}。")
+    st.caption(f"Data source: {source_label}. Date range: {stock['date'].min().date()} to {stock['date'].max().date()}.")
 
     latest = stock.dropna(subset=["adjusted_close"]).iloc[-1]
     returns = pd.to_numeric(stock["daily_return"], errors="coerce").dropna()
     max_dd, _ = maximum_drawdown(returns)
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("最新复权收盘价", f"{latest['adjusted_close']:.2f}")
-    col2.metric("21 日收益", percent_value(latest.get("return_21d")))
-    col3.metric("126 日收益", percent_value(latest.get("return_126d")))
-    col4.metric("最大回撤", percent_value(max_dd))
+    col1.metric("Latest Adjusted Close", f"{latest['adjusted_close']:.2f}")
+    col2.metric("21D Return", percent_value(latest.get("return_21d")))
+    col3.metric("126D Return", percent_value(latest.get("return_126d")))
+    col4.metric("Maximum Drawdown", percent_value(max_dd))
 
     summary = generate_technical_summary(latest)
-    st.subheader("技术指标结论")
+    st.subheader("Technical Signal Interpretation")
     render_signal_card(summary)
 
     fig = go.Figure()
@@ -787,7 +1081,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
             x=stock["date"],
             y=stock["adjusted_close"],
             mode="lines",
-            name="复权收盘价",
+            name="Adjusted Close",
             line=dict(color="#121821", width=2.2),
         )
     )
@@ -811,7 +1105,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
                 line=dict(color="#b88324", width=1.8),
             )
         )
-    fig = style_figure(fig, title=f"{ticker} 价格与移动均线", height=440)
+    fig = style_figure(fig, title=f"{ticker} Price and Moving Averages", height=440)
     st.plotly_chart(fig, width="stretch")
 
     indicator_cols = [
@@ -840,8 +1134,8 @@ def strategy_weights(features: pd.DataFrame, strategy: str, top_n: int, entry_z:
 def render_backtest_lab() -> None:
     render_page_title(
         "Strategy Backtesting",
-        "回测实验室",
-        "在已处理股票池上比较动量、均值回归与多因子策略，包含交易成本、滑点与信号滞后。",
+        "Backtest Lab",
+        "Compare momentum, mean-reversion, and multi-factor strategies with transaction costs, slippage, and signal lag.",
     )
     features = load_features()
     if features.empty:
@@ -849,15 +1143,15 @@ def render_backtest_lab() -> None:
         return
 
     col1, col2, col3 = st.columns(3)
-    strategy_display = col1.selectbox("策略", ["动量", "均值回归", "多因子"])
-    strategy = {"动量": "Momentum", "均值回归": "Mean Reversion", "多因子": "Factor"}[strategy_display]
+    strategy_display = col1.selectbox("Strategy", ["Momentum", "Mean Reversion", "Multi-Factor"])
+    strategy = {"Momentum": "Momentum", "Mean Reversion": "Mean Reversion", "Multi-Factor": "Factor"}[strategy_display]
     top_n = col2.slider("Top N", 3, 20, 10)
-    entry_z = col3.select_slider("均值回归入场 Z-score", options=[-1.5, -2.0, -2.5], value=-2.0)
+    entry_z = col3.select_slider("Mean-Reversion Entry Z-score", options=[-1.5, -2.0, -2.5], value=-2.0)
 
     cost_col1, cost_col2, cost_col3 = st.columns(3)
-    capital = cost_col1.number_input("初始资金", min_value=10_000, max_value=1_000_000, value=100_000, step=10_000)
-    transaction_cost = cost_col2.number_input("交易成本 bps", min_value=0.0, max_value=50.0, value=5.0, step=1.0)
-    slippage = cost_col3.number_input("滑点 bps", min_value=0.0, max_value=50.0, value=2.0, step=1.0)
+    capital = cost_col1.number_input("Initial Capital", min_value=10_000, max_value=1_000_000, value=100_000, step=10_000)
+    transaction_cost = cost_col2.number_input("Transaction Cost bps", min_value=0.0, max_value=50.0, value=5.0, step=1.0)
+    slippage = cost_col3.number_input("Slippage bps", min_value=0.0, max_value=50.0, value=2.0, step=1.0)
 
     weights = strategy_weights(features, strategy, top_n=top_n, entry_z=float(entry_z))
     engine = BacktestEngine(
@@ -872,20 +1166,20 @@ def render_backtest_lab() -> None:
     summary = performance_summary(returns, benchmark_returns=benchmark)
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("累计收益", percent_value(summary.get("cumulative_return")))
-    col2.metric("年化收益", percent_value(summary.get("annualized_return")))
-    col3.metric("夏普比率", f"{summary.get('sharpe_ratio', np.nan):.3f}")
-    col4.metric("最大回撤", percent_value(summary.get("maximum_drawdown")))
+    col1.metric("Cumulative Return", percent_value(summary.get("cumulative_return")))
+    col2.metric("Annualized Return", percent_value(summary.get("annualized_return")))
+    col3.metric("Sharpe Ratio", f"{summary.get('sharpe_ratio', np.nan):.3f}")
+    col4.metric("Maximum Drawdown", percent_value(summary.get("maximum_drawdown")))
 
-    st.plotly_chart(line_chart(result.portfolio_value, "date", "total_value", f"{strategy_display}策略回测"), width="stretch")
+    st.plotly_chart(line_chart(result.portfolio_value, "date", "total_value", f"{strategy_display} Strategy Backtest"), width="stretch")
     st.dataframe(result.trades.tail(50), width="stretch", hide_index=True)
 
 
 def render_risk_factors() -> None:
     render_page_title(
         "Risk Attribution",
-        "风险与因子",
-        "查看组合表现、Fama-French 因子暴露、参数敏感性和市场基准比较。",
+        "Risk & Factors",
+        "Inspect portfolio performance, Fama-French exposures, parameter sensitivity, and benchmark comparison.",
     )
     performance = read_csv(file_signature(RESULTS_DIR / "performance_summary.csv"))
     exposure = read_csv(file_signature(RESULTS_DIR / "factor_exposure.csv"))
@@ -893,19 +1187,19 @@ def render_risk_factors() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("表现摘要")
+        st.subheader("Performance Summary")
         if performance.empty:
             render_missing_results()
         else:
             st.dataframe(performance, width="stretch")
     with col2:
-        st.subheader("因子暴露")
+        st.subheader("Factor Exposure")
         if exposure.empty:
             render_missing_results()
         else:
             st.dataframe(exposure, width="stretch")
 
-    st.subheader("参数敏感性")
+    st.subheader("Parameter Sensitivity")
     if sensitivity.empty:
         render_missing_results()
     else:
@@ -915,19 +1209,19 @@ def render_risk_factors() -> None:
 def render_data_ml() -> None:
     render_page_title(
         "Data Diagnostics",
-        "数据与机器学习",
-        "检查行情清洗质量，并展示收益率预测模型的时间序列验证结果。",
+        "Data & Machine Learning",
+        "Audit market-data cleaning quality and inspect chronological validation for return-prediction baselines.",
     )
     quality = read_csv(file_signature(RESULTS_DIR / "data_quality_report.csv"))
     ml = read_csv(file_signature(RESULTS_DIR / "ml_model_comparison.csv"))
 
-    st.subheader("数据质量")
+    st.subheader("Data Quality")
     if quality.empty:
         render_missing_results()
     else:
         st.dataframe(quality, width="stretch", hide_index=True)
 
-    st.subheader("机器学习基线模型")
+    st.subheader("Machine Learning Baselines")
     if ml.empty:
         render_missing_results()
     else:
@@ -937,18 +1231,18 @@ def render_data_ml() -> None:
 def render_derivatives_lab() -> None:
     render_page_title(
         "Derivatives Pricing",
-        "衍生品实验室",
-        "使用 Black-Scholes、二叉树、Monte Carlo 和 Greeks 分析欧式期权，并查看 Delta 对冲实验。",
+        "Derivatives Lab",
+        "Analyze European options with Black-Scholes, binomial trees, Monte Carlo, Greeks, and delta-hedging experiments.",
     )
     col1, col2, col3 = st.columns(3)
-    spot = col1.number_input("标的价格", min_value=1.0, value=100.0, step=1.0)
-    strike = col2.number_input("行权价", min_value=1.0, value=100.0, step=1.0)
-    maturity = col3.number_input("到期年限", min_value=0.01, value=1.0, step=0.05)
+    spot = col1.number_input("Spot Price", min_value=1.0, value=100.0, step=1.0)
+    strike = col2.number_input("Strike Price", min_value=1.0, value=100.0, step=1.0)
+    maturity = col3.number_input("Years to Maturity", min_value=0.01, value=1.0, step=0.05)
 
     col4, col5, col6 = st.columns(3)
-    rate = col4.number_input("无风险利率", min_value=0.0, max_value=0.25, value=0.04, step=0.005)
-    volatility = col5.number_input("波动率", min_value=0.01, max_value=2.0, value=0.20, step=0.01)
-    option_type = col6.selectbox("期权类型", ["call", "put"])
+    rate = col4.number_input("Risk-Free Rate", min_value=0.0, max_value=0.25, value=0.04, step=0.005)
+    volatility = col5.number_input("Volatility", min_value=0.01, max_value=2.0, value=0.20, step=0.01)
+    option_type = col6.selectbox("Option Type", ["call", "put"])
 
     contract = OptionContract(
         spot=float(spot),
@@ -960,7 +1254,7 @@ def render_derivatives_lab() -> None:
     )
     bs_price = black_scholes_price(contract)
     tree_price = binomial_option_price(contract, steps=300)
-    mc_paths = st.slider("Monte Carlo 路径数", 1_000, 100_000, 20_000, step=1_000)
+    mc_paths = st.slider("Monte Carlo Paths", 1_000, 100_000, 20_000, step=1_000)
     mc = monte_carlo_option_price(contract, n_paths=int(mc_paths), seed=7, antithetic=True, control_variate=True)
     greeks = black_scholes_greeks(contract)
 
@@ -968,9 +1262,9 @@ def render_derivatives_lab() -> None:
     col1.metric("Black-Scholes", f"{bs_price:.4f}")
     col2.metric("Binomial Tree", f"{tree_price:.4f}")
     col3.metric("Monte Carlo", f"{mc.price:.4f}")
-    col4.metric("MC 标准误", f"{mc.standard_error:.4f}")
+    col4.metric("MC Standard Error", f"{mc.standard_error:.4f}")
 
-    st.subheader("Greeks 风险敏感度")
+    st.subheader("Greeks Risk Sensitivities")
     greek_frame = pd.DataFrame([greeks]).T.reset_index()
     greek_frame.columns = ["Greek", "Value"]
     st.dataframe(greek_frame, width="stretch", hide_index=True)
@@ -979,13 +1273,13 @@ def render_derivatives_lab() -> None:
     hedging = read_csv(file_signature(RESULTS_DIR / "delta_hedging_frequency.csv"))
     col_left, col_right = st.columns(2)
     with col_left:
-        st.subheader("已保存定价对比")
+        st.subheader("Saved Pricing Comparison")
         if pricing.empty:
             render_missing_results()
         else:
             st.dataframe(pricing, width="stretch", hide_index=True)
     with col_right:
-        st.subheader("已保存对冲频率实验")
+        st.subheader("Saved Hedge-Frequency Experiment")
         if hedging.empty:
             render_missing_results()
         else:
@@ -998,7 +1292,7 @@ def main() -> None:
         """
         <div class="sidebar-brand">
             <div class="mark">QRF</div>
-            <div class="name">量化研究终端</div>
+            <div class="name">Quant Research Terminal</div>
             <div class="desc">Equity strategies, factor models, ML baselines, derivatives pricing.</div>
         </div>
         """,
@@ -1007,22 +1301,22 @@ def main() -> None:
     render_app_header(len(tickers))
 
     query = st.text_input(
-        "全局搜索",
-        placeholder="输入股票、策略、指标或模型，例如 NVDA、Sharpe、Fama-French、Black-Scholes...",
+        "Global Search",
+        placeholder="Search tickers, strategies, metrics, or models, e.g. NVDA, Sharpe, Fama-French, Black-Scholes...",
         label_visibility="collapsed",
     )
     render_search(query, tickers)
 
     pages = {
-        "研究概览": render_overview,
-        "股票浏览器": lambda: render_stock_explorer(tickers),
-        "回测实验室": render_backtest_lab,
-        "风险与因子": render_risk_factors,
-        "数据与机器学习": render_data_ml,
-        "衍生品实验室": render_derivatives_lab,
-        "AI 投资研究台": render_ai_investment_platform,
+        "Home": render_overview,
+        "Stock Explorer": lambda: render_stock_explorer(tickers),
+        "Backtest Lab": render_backtest_lab,
+        "Risk & Factors": render_risk_factors,
+        "Data & ML": render_data_ml,
+        "Derivatives Lab": render_derivatives_lab,
+        "AI Research Desk": render_ai_investment_platform,
     }
-    selected = st.sidebar.radio("工作区", list(pages.keys()))
+    selected = st.sidebar.radio("Workspace", list(pages.keys()))
     pages[selected]()
 
 

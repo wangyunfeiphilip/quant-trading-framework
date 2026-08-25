@@ -30,10 +30,10 @@ def _percent(value: float | None) -> str:
 
 def _level(score: int) -> tuple[str, str]:
     if score >= 4:
-        return "偏多", "趋势、动量和技术确认度较高，当前技术面偏强。"
+        return "Bullish", "Trend, momentum, and confirmation signals are aligned to the upside."
     if score <= -4:
-        return "偏空", "价格结构和动量信号偏弱，应优先关注回撤风险。"
-    return "中性", "指标之间存在分歧，更适合继续观察确认信号。"
+        return "Bearish", "Price structure and momentum are weak; downside risk deserves priority."
+    return "Neutral", "Signals are mixed, so confirmation matters more than directional conviction."
 
 
 def generate_technical_summary(row: Mapping[str, object]) -> TechnicalSummary:
@@ -58,18 +58,18 @@ def generate_technical_summary(row: Mapping[str, object]) -> TechnicalSummary:
     if price is not None and sma_20 is not None and sma_60 is not None:
         if price > sma_20 > sma_60:
             score += 2
-            bullets.append("趋势：价格位于 SMA20 和 SMA60 上方，短中期均线呈多头排列。")
+            bullets.append("Trend: price is above SMA20 and SMA60, with a bullish short-to-medium-term moving-average stack.")
         elif price < sma_20 < sma_60:
             score -= 2
-            bullets.append("趋势：价格位于 SMA20 和 SMA60 下方，短中期均线呈空头排列。")
+            bullets.append("Trend: price is below SMA20 and SMA60, with a bearish short-to-medium-term moving-average stack.")
         elif price > sma_20 and price > sma_60:
             score += 1
-            bullets.append("趋势：价格仍在主要均线上方，但均线结构尚未完全顺畅。")
+            bullets.append("Trend: price remains above the major moving averages, but the structure is not fully aligned.")
         elif price < sma_20 and price < sma_60:
             score -= 1
-            bullets.append("趋势：价格跌破主要均线，短期趋势承压。")
+            bullets.append("Trend: price has broken below the major moving averages, leaving the short-term trend under pressure.")
         else:
-            bullets.append("趋势：价格与均线位置交错，趋势信号暂不明确。")
+            bullets.append("Trend: price and moving averages are crossed, so the trend signal is not yet clear.")
 
     momentum_values = [value for value in (ret_21d, ret_63d, ret_126d) if value is not None]
     if momentum_values:
@@ -78,56 +78,56 @@ def generate_technical_summary(row: Mapping[str, object]) -> TechnicalSummary:
         if positives == len(momentum_values):
             score += 2
             bullets.append(
-                f"动量：21/63/126 日收益均为正，分别为 {_percent(ret_21d)}、{_percent(ret_63d)}、{_percent(ret_126d)}。"
+                f"Momentum: 21/63/126-day returns are all positive at {_percent(ret_21d)}, {_percent(ret_63d)}, and {_percent(ret_126d)}."
             )
         elif negatives == len(momentum_values):
             score -= 2
             bullets.append(
-                f"动量：21/63/126 日收益均为负，分别为 {_percent(ret_21d)}、{_percent(ret_63d)}、{_percent(ret_126d)}。"
+                f"Momentum: 21/63/126-day returns are all negative at {_percent(ret_21d)}, {_percent(ret_63d)}, and {_percent(ret_126d)}."
             )
         else:
             bullets.append(
-                f"动量：不同周期收益分化，21/63/126 日分别为 {_percent(ret_21d)}、{_percent(ret_63d)}、{_percent(ret_126d)}。"
+                f"Momentum: return windows are mixed; 21/63/126-day returns are {_percent(ret_21d)}, {_percent(ret_63d)}, and {_percent(ret_126d)}."
             )
 
     if rsi is not None:
         if rsi >= 70:
             score -= 1
-            bullets.append(f"RSI：{rsi:.1f}，进入超买区，继续追涨的风险上升。")
+            bullets.append(f"RSI: {rsi:.1f}, in overbought territory; chasing strength carries higher short-term risk.")
         elif rsi <= 30:
             score += 1
-            bullets.append(f"RSI：{rsi:.1f}，进入超卖区，可能存在均值回归观察点。")
+            bullets.append(f"RSI: {rsi:.1f}, in oversold territory; this can be a mean-reversion watch point.")
         elif rsi >= 55:
             score += 1
-            bullets.append(f"RSI：{rsi:.1f}，多头动能相对占优但未进入极端区间。")
+            bullets.append(f"RSI: {rsi:.1f}, positive momentum has the edge without reaching an extreme zone.")
         elif rsi <= 45:
             score -= 1
-            bullets.append(f"RSI：{rsi:.1f}，买盘动能偏弱。")
+            bullets.append(f"RSI: {rsi:.1f}, buying momentum is relatively weak.")
         else:
-            bullets.append(f"RSI：{rsi:.1f}，处于中性区间。")
+            bullets.append(f"RSI: {rsi:.1f}, in a neutral range.")
 
     if macd is not None and macd_signal is not None:
         if macd > macd_signal and (macd_hist is None or macd_hist >= 0):
             score += 1
-            bullets.append("MACD：快线位于信号线上方，短期动量确认偏正面。")
+            bullets.append("MACD: the fast line is above the signal line, confirming positive short-term momentum.")
         elif macd < macd_signal and (macd_hist is None or macd_hist <= 0):
             score -= 1
-            bullets.append("MACD：快线位于信号线下方，短期动量确认偏负面。")
+            bullets.append("MACD: the fast line is below the signal line, confirming negative short-term momentum.")
         else:
-            bullets.append("MACD：快线与柱状图信号不完全一致，动量确认度一般。")
+            bullets.append("MACD: the fast line and histogram do not fully agree, so confirmation is moderate.")
 
     if zscore is not None:
         if zscore >= 2:
             score -= 1
-            bullets.append(f"布林带：Z-score 为 {zscore:.2f}，价格明显高于滚动均值，短线可能偏拥挤。")
+            bullets.append(f"Bollinger/Z-score: {zscore:.2f}; price is materially above its rolling mean and may be crowded short term.")
         elif zscore <= -2:
             score += 1
-            bullets.append(f"布林带：Z-score 为 {zscore:.2f}，价格明显低于滚动均值，存在反弹观察点。")
+            bullets.append(f"Bollinger/Z-score: {zscore:.2f}; price is materially below its rolling mean, creating a rebound watch point.")
         else:
-            bullets.append(f"布林带：Z-score 为 {zscore:.2f}，价格没有显著偏离 20 日均值。")
+            bullets.append(f"Bollinger/Z-score: {zscore:.2f}; price is not materially stretched versus its 20-day mean.")
 
     if vol_21d is not None:
-        bullets.append(f"风险：21 日年化波动率约为 {_percent(vol_21d)}，仓位和止损应与波动水平匹配。")
+        bullets.append(f"Risk: 21-day annualized volatility is about {_percent(vol_21d)}; position sizing should match the volatility regime.")
 
     stance, headline = _level(score)
     return TechnicalSummary(stance=stance, headline=headline, bullets=bullets[:6])
