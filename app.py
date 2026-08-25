@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import json
+from html import escape
 from pathlib import Path
 import sys
 
@@ -48,62 +49,269 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stApp { background: #f6f7f9; color: #20242c; }
-    .block-container { max-width: 1240px; padding-top: 1.2rem; padding-bottom: 2rem; }
+    :root {
+        --ink: #121821;
+        --muted: #657184;
+        --panel: #ffffff;
+        --panel-soft: #f7f9fb;
+        --line: #dfe5ec;
+        --line-strong: #c9d2de;
+        --teal: #0b766d;
+        --teal-dark: #075a54;
+        --gold: #b88324;
+        --blue: #315f8d;
+        --red: #b33a3a;
+        --sidebar: #10141b;
+    }
+    @keyframes liftIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .stApp {
+        background:
+            linear-gradient(90deg, rgba(16, 24, 35, 0.035) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(16, 24, 35, 0.03) 1px, transparent 1px),
+            linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
+        background-size: 32px 32px, 32px 32px, auto;
+        color: var(--ink);
+    }
+    .block-container {
+        max-width: 1280px;
+        padding-top: 1rem;
+        padding-bottom: 2.5rem;
+    }
     [data-testid="stSidebar"] {
-        background: #171a21;
-        border-right: 1px solid #292d36;
+        background:
+            linear-gradient(180deg, #111720 0%, #0d1118 100%);
+        border-right: 1px solid #242c36;
+        box-shadow: 14px 0 30px rgba(15, 23, 32, 0.12);
     }
     [data-testid="stSidebar"] * { color: #f4f6f8; }
-    [data-testid="stSidebar"] .stRadio label {
+    [data-testid="stSidebar"] [role="radiogroup"] label {
         border-radius: 8px;
-        padding: 4px 2px;
+        padding: 8px 10px;
+        margin: 2px 0;
+        transition: background 180ms ease, transform 180ms ease;
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateX(2px);
+    }
+    [data-testid="stSidebar"] .stCaption,
+    [data-testid="stSidebar"] p {
+        color: rgba(244, 246, 248, 0.68) !important;
     }
     h1, h2, h3 { letter-spacing: 0; }
-    h1 { font-size: 2.5rem; margin-bottom: 0.35rem; }
-    h2 { margin-top: 1.25rem; }
-    div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #e4e7ec;
-        border-radius: 8px;
-        padding: 14px 16px;
-        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-    }
-    div[data-testid="stMetric"] label { color: #667085; }
-    div[data-testid="stMetricValue"] { color: #111827; font-weight: 700; }
-    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
-        border: 1px solid #e4e7ec;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .terminal-title {
-        border: 1px solid #e4e7ec;
-        background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
-        border-radius: 8px;
+    h1 { font-size: 2.35rem; margin-bottom: 0.35rem; }
+    h2 { margin-top: 1.1rem; }
+    .app-shell {
+        border: 1px solid rgba(201, 210, 222, 0.9);
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 249, 251, 0.96) 100%);
+        border-radius: 10px;
         padding: 18px 20px;
-        margin-bottom: 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 18px 45px rgba(18, 24, 33, 0.08);
+        animation: liftIn 320ms ease both;
+    }
+    .app-shell-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .brand-kicker,
+    .terminal-title .eyebrow {
+        color: var(--teal);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+    .brand-title {
+        color: var(--ink);
+        font-size: 1.75rem;
+        font-weight: 780;
+        line-height: 1.1;
+        margin-top: 6px;
+    }
+    .brand-subtitle {
+        color: var(--muted);
+        font-size: 0.98rem;
+        margin-top: 8px;
+        max-width: 760px;
+    }
+    .system-chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        min-width: 260px;
+    }
+    .chip {
+        border: 1px solid #d8e0e8;
+        background: #ffffff;
+        color: #354155;
+        border-radius: 999px;
+        padding: 7px 11px;
+        font-size: 0.78rem;
+        font-weight: 700;
         box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
     }
-    .terminal-title .eyebrow {
-        color: #0f766e;
-        font-size: 0.82rem;
-        font-weight: 700;
-        text-transform: uppercase;
+    .chip-teal { color: var(--teal-dark); border-color: rgba(11, 118, 109, 0.26); background: rgba(11, 118, 109, 0.08); }
+    .chip-gold { color: #7c5619; border-color: rgba(184, 131, 36, 0.32); background: rgba(184, 131, 36, 0.09); }
+    .sidebar-brand {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 14px 14px 13px;
+        margin: 2px 0 18px;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .sidebar-brand .mark {
+        color: #8dd5cd;
+        font-weight: 850;
         letter-spacing: 0.08em;
+        font-size: 0.78rem;
         margin-bottom: 6px;
     }
-    .terminal-title .title {
-        color: #111827;
-        font-size: 1.55rem;
-        font-weight: 750;
+    .sidebar-brand .name {
+        color: #ffffff;
+        font-weight: 780;
         line-height: 1.2;
     }
+    .sidebar-brand .desc {
+        color: rgba(244, 246, 248, 0.62);
+        font-size: 0.78rem;
+        margin-top: 7px;
+        line-height: 1.45;
+    }
+    .stTextInput input,
+    .stNumberInput input,
+    .stSelectbox [data-baseweb="select"] > div {
+        border-radius: 8px !important;
+        border-color: var(--line) !important;
+        background: rgba(255, 255, 255, 0.94) !important;
+        min-height: 48px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+    }
+    .stTextInput input:focus,
+    .stNumberInput input:focus {
+        border-color: rgba(11, 118, 109, 0.65) !important;
+        box-shadow: 0 0 0 3px rgba(11, 118, 109, 0.12) !important;
+    }
+    .stButton button {
+        min-height: 48px;
+        border-radius: 8px;
+        border: 1px solid var(--line-strong);
+        background: #ffffff;
+        color: var(--ink);
+        font-weight: 750;
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+    .stButton button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(11, 118, 109, 0.45);
+        box-shadow: 0 8px 22px rgba(18, 24, 33, 0.09);
+    }
+    div[data-testid="stMetric"] {
+        background:
+            linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 15px 16px;
+        box-shadow: 0 12px 30px rgba(18, 24, 33, 0.06);
+        animation: liftIn 280ms ease both;
+    }
+    div[data-testid="stMetric"] label { color: var(--muted); font-weight: 700; }
+    div[data-testid="stMetricValue"] { color: var(--ink); font-weight: 800; }
+    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 10px 26px rgba(18, 24, 33, 0.05);
+    }
+    .terminal-title {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--teal);
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.96) 100%);
+        border-radius: 10px;
+        padding: 20px 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 12px 32px rgba(18, 24, 33, 0.06);
+        animation: liftIn 300ms ease both;
+    }
+    .terminal-title .title {
+        color: var(--ink);
+        font-size: 1.65rem;
+        font-weight: 820;
+        line-height: 1.2;
+        margin-top: 5px;
+    }
     .terminal-title .subtitle {
-        color: #667085;
+        color: var(--muted);
         margin-top: 6px;
         font-size: 0.98rem;
     }
-    .small-note { color: #667085; font-size: 0.9rem; }
+    .signal-panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 17px 18px;
+        margin: 12px 0 18px;
+        box-shadow: 0 14px 34px rgba(18, 24, 33, 0.07);
+        animation: liftIn 340ms ease both;
+    }
+    .signal-panel.bullish { border-left: 4px solid var(--teal); }
+    .signal-panel.neutral { border-left: 4px solid var(--gold); }
+    .signal-panel.bearish { border-left: 4px solid var(--red); }
+    .signal-head {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .signal-badge {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        font-weight: 820;
+        border: 1px solid var(--line);
+    }
+    .bullish .signal-badge { color: var(--teal-dark); background: rgba(11,118,109,0.09); border-color: rgba(11,118,109,0.26); }
+    .neutral .signal-badge { color: #7c5619; background: rgba(184,131,36,0.10); border-color: rgba(184,131,36,0.28); }
+    .bearish .signal-badge { color: var(--red); background: rgba(179,58,58,0.09); border-color: rgba(179,58,58,0.25); }
+    .signal-headline { color: var(--ink); font-weight: 760; }
+    .signal-panel ul {
+        margin: 8px 0 0 1.1rem;
+        padding: 0;
+        color: #394457;
+        line-height: 1.68;
+    }
+    .signal-note {
+        color: var(--muted);
+        font-size: 0.84rem;
+        margin-top: 10px;
+    }
+    .small-note { color: var(--muted); font-size: 0.9rem; }
+    [data-testid="stPlotlyChart"] {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        background: #ffffff;
+        box-shadow: 0 14px 34px rgba(18, 24, 33, 0.06);
+    }
+    .stAlert {
+        border-radius: 8px;
+    }
+    @media (max-width: 760px) {
+        .brand-title { font-size: 1.35rem; }
+        .system-chips { justify-content: flex-start; min-width: auto; }
+        .app-shell { padding: 16px; }
+        .terminal-title { padding: 17px; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -250,11 +458,42 @@ def percent_value(value: float | int | None) -> str:
     return f"{value:.2%}"
 
 
+def style_figure(fig: go.Figure, title: str, height: int = 420) -> go.Figure:
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=18, color="#121821"), x=0.02),
+        height=height,
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=18, r=18, t=58, b=18),
+        font=dict(color="#354155", family="Arial, sans-serif"),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            bgcolor="rgba(255,255,255,0.72)",
+        ),
+        hovermode="x unified",
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(101, 113, 132, 0.13)", zeroline=False)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(101, 113, 132, 0.13)", zeroline=False)
+    return fig
+
+
 def line_chart(frame: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=frame[x], y=frame[y], mode="lines", name=y))
-    fig.update_layout(title=title, height=420, margin=dict(l=20, r=20, t=55, b=20))
-    return fig
+    fig.add_trace(
+        go.Scatter(
+            x=frame[x],
+            y=frame[y],
+            mode="lines",
+            name=y,
+            line=dict(color="#0b766d", width=2.4),
+        )
+    )
+    return style_figure(fig, title=title, height=420)
 
 
 def render_missing_results() -> None:
@@ -268,6 +507,50 @@ def render_page_title(eyebrow: str, title: str, subtitle: str) -> None:
             <div class="eyebrow">{eyebrow}</div>
             <div class="title">{title}</div>
             <div class="subtitle">{subtitle}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_header(ticker_count: int) -> None:
+    st.markdown(
+        f"""
+        <div class="app-shell">
+            <div class="app-shell-top">
+                <div>
+                    <div class="brand-kicker">Quantitative Research Framework</div>
+                    <div class="brand-title">Equity Strategies and Derivatives Pricing</div>
+                    <div class="brand-subtitle">
+                        面向研究展示的量化工作台：股票策略回测、风险归因、Fama-French 因子模型、
+                        机器学习基线与期权定价实验集中在一个可交互界面。
+                    </div>
+                </div>
+                <div class="system-chips">
+                    <span class="chip chip-teal">{ticker_count} 个研究标的</span>
+                    <span class="chip chip-gold">Signal-lagged backtest</span>
+                    <span class="chip">Streamlit Demo</span>
+                    <span class="chip">Python / C++</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_signal_card(summary) -> None:
+    tone = {"偏多": "bullish", "偏空": "bearish"}.get(summary.stance, "neutral")
+    bullets = "".join(f"<li>{escape(item)}</li>" for item in summary.bullets)
+    st.markdown(
+        f"""
+        <div class="signal-panel {tone}">
+            <div class="signal-head">
+                <span class="signal-badge">综合判断：{escape(summary.stance)}</span>
+                <span class="signal-headline">{escape(summary.headline)}</span>
+            </div>
+            <ul>{bullets}</ul>
+            <div class="signal-note">以上为基于最新一日技术指标的研究型解读，不构成投资建议。</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -496,18 +779,39 @@ def render_stock_explorer(tickers: list[str]) -> None:
 
     summary = generate_technical_summary(latest)
     st.subheader("技术指标结论")
-    st.markdown(f"**综合判断：{summary.stance}。** {summary.headline}")
-    for item in summary.bullets:
-        st.markdown(f"- {item}")
-    st.caption("以上为基于最新一日技术指标的研究型解读，不构成投资建议。")
+    render_signal_card(summary)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=stock["date"], y=stock["adjusted_close"], mode="lines", name="复权收盘价"))
+    fig.add_trace(
+        go.Scatter(
+            x=stock["date"],
+            y=stock["adjusted_close"],
+            mode="lines",
+            name="复权收盘价",
+            line=dict(color="#121821", width=2.2),
+        )
+    )
     if "sma_20" in stock:
-        fig.add_trace(go.Scatter(x=stock["date"], y=stock["sma_20"], mode="lines", name="SMA 20"))
+        fig.add_trace(
+            go.Scatter(
+                x=stock["date"],
+                y=stock["sma_20"],
+                mode="lines",
+                name="SMA 20",
+                line=dict(color="#0b766d", width=1.8),
+            )
+        )
     if "sma_60" in stock:
-        fig.add_trace(go.Scatter(x=stock["date"], y=stock["sma_60"], mode="lines", name="SMA 60"))
-    fig.update_layout(title=f"{ticker} 价格与移动均线", height=440, margin=dict(l=20, r=20, t=55, b=20))
+        fig.add_trace(
+            go.Scatter(
+                x=stock["date"],
+                y=stock["sma_60"],
+                mode="lines",
+                name="SMA 60",
+                line=dict(color="#b88324", width=1.8),
+            )
+        )
+    fig = style_figure(fig, title=f"{ticker} 价格与移动均线", height=440)
     st.plotly_chart(fig, width="stretch")
 
     indicator_cols = [
@@ -690,12 +994,22 @@ def render_derivatives_lab() -> None:
 
 def main() -> None:
     tickers = load_config_tickers()
-    st.sidebar.markdown("### 量化研究终端")
-    st.sidebar.caption("Equity Strategies · Factor Models · Derivatives")
+    st.sidebar.markdown(
+        """
+        <div class="sidebar-brand">
+            <div class="mark">QRF</div>
+            <div class="name">量化研究终端</div>
+            <div class="desc">Equity strategies, factor models, ML baselines, derivatives pricing.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    render_app_header(len(tickers))
 
     query = st.text_input(
         "全局搜索",
         placeholder="输入股票、策略、指标或模型，例如 NVDA、Sharpe、Fama-French、Black-Scholes...",
+        label_visibility="collapsed",
     )
     render_search(query, tickers)
 
