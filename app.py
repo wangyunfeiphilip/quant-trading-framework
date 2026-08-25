@@ -50,20 +50,22 @@ st.markdown(
     """
     <style>
     :root {
-        --ink: #0b1218;
-        --muted: #6a7483;
-        --panel: #ffffff;
-        --panel-soft: #f4f7f8;
-        --line: #d9e3e4;
-        --line-strong: #bdcdd0;
-        --teal: #10bfae;
-        --teal-hot: #73ffe7;
-        --teal-dark: #06756b;
-        --gold: #d5b15d;
-        --blue: #426b9b;
+        --ink: #f8f6ef;
+        --body: #1b1713;
+        --muted: #9d9b95;
+        --panel: #24211d;
+        --panel-soft: #2a2722;
+        --line: rgba(255, 255, 255, 0.10);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --teal: #b7f8df;
+        --teal-hot: #d6fff1;
+        --teal-dark: #78d5be;
+        --gold: #f3d687;
+        --blue: #9fb7ff;
         --red: #b33a3a;
-        --night: #071014;
-        --night-2: #0e171d;
+        --night: #171410;
+        --night-2: #211e19;
+        --cream: #f7f2e8;
         --sidebar: #10141b;
     }
     @keyframes liftIn {
@@ -81,18 +83,16 @@ st.markdown(
     }
     .stApp {
         background:
-            radial-gradient(circle at 18% -8%, rgba(115, 255, 231, 0.19), transparent 30%),
-            radial-gradient(circle at 84% 12%, rgba(213, 177, 93, 0.13), transparent 28%),
-            linear-gradient(90deg, rgba(115, 255, 231, 0.055) 1px, transparent 1px),
-            linear-gradient(180deg, rgba(115, 255, 231, 0.045) 1px, transparent 1px),
-            linear-gradient(180deg, #060d11 0%, #081117 34%, #eef3f5 34%, #f7f9fb 100%);
-        background-size: auto, auto, 38px 38px, 38px 38px, auto;
+            radial-gradient(circle at 50% -12%, rgba(247, 242, 232, 0.09), transparent 24%),
+            radial-gradient(circle at 12% 18%, rgba(183, 248, 223, 0.08), transparent 22%),
+            linear-gradient(180deg, #1b1713 0%, #171410 58%, #15120f 100%);
+        background-size: auto;
         color: var(--ink);
     }
     .block-container {
-        max-width: 1840px;
-        padding-top: 0.65rem;
-        padding-bottom: 2.5rem;
+        max-width: 1580px;
+        padding-top: 1.35rem;
+        padding-bottom: 3.5rem;
     }
     [data-testid="stSidebar"],
     [data-testid="collapsedControl"] {
@@ -119,7 +119,7 @@ st.markdown(
     [data-testid="stSidebar"] p {
         color: rgba(244, 246, 248, 0.68) !important;
     }
-    h1, h2, h3 { letter-spacing: 0; }
+    h1, h2, h3 { letter-spacing: 0; color: var(--ink); }
     h1 { font-size: 2.35rem; margin-bottom: 0.35rem; }
     h2 { margin-top: 1.1rem; }
     .app-shell {
@@ -135,45 +135,30 @@ st.markdown(
     .home-hero {
         position: relative;
         overflow: hidden;
-        border: 1px solid rgba(115, 255, 231, 0.26);
-        border-radius: 12px;
-        padding: 28px 36px 20px;
-        margin: 0 0 20px;
-        min-height: 560px;
-        color: #f5fbff;
+        border: 0;
+        border-radius: 0;
+        padding: 58px 24px 28px;
+        margin: 0 auto 8px;
+        min-height: auto;
+        color: var(--cream);
         background:
-            linear-gradient(90deg, rgba(115, 255, 231, 0.08) 1px, transparent 1px),
-            linear-gradient(180deg, rgba(115, 255, 231, 0.06) 1px, transparent 1px),
-            radial-gradient(circle at 72% 32%, rgba(213, 177, 93, 0.15), transparent 30%),
-            linear-gradient(135deg, #061014 0%, #0a141b 48%, #14150e 100%);
-        background-size: 42px 42px, 42px 42px, auto, auto;
-        box-shadow:
-            0 34px 90px rgba(7, 16, 20, 0.42),
-            inset 0 0 0 1px rgba(255,255,255,0.04);
+            radial-gradient(circle at 50% 8%, rgba(255,255,255,0.055), transparent 35%);
+        box-shadow: none;
         animation: liftIn 420ms ease both;
+        text-align: center;
     }
     .home-hero:before {
         content: "";
         position: absolute;
         inset: 0;
         background:
-            repeating-linear-gradient(180deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 7px),
-            linear-gradient(120deg, transparent 0%, rgba(119, 255, 231, 0.10) 44%, transparent 68%);
-        opacity: 0.34;
+            linear-gradient(90deg, transparent, rgba(255,255,255,0.035), transparent);
+        opacity: 0.22;
         pointer-events: none;
-        animation: gridShift 20s linear infinite;
+        animation: signalSweep 9s ease-in-out infinite;
     }
     .home-hero:after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 52%;
-        background: linear-gradient(90deg, transparent, rgba(115, 255, 231, 0.16), transparent);
-        filter: blur(6px);
-        pointer-events: none;
-        animation: signalSweep 7.5s ease-in-out infinite;
+        display: none;
     }
     @keyframes scanDrift {
         from { transform: translateY(-24px); }
@@ -183,71 +168,81 @@ st.markdown(
         position: relative;
         z-index: 1;
         display: grid;
-        grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
-        gap: 42px;
-        align-items: stretch;
+        grid-template-columns: 1fr;
+        gap: 28px;
+        align-items: center;
+        justify-items: center;
     }
     .hero-system-row {
+        display: none;
         position: relative;
         z-index: 1;
-        display: flex;
+        display: none;
         gap: 10px;
         flex-wrap: wrap;
+        justify-content: center;
         margin-bottom: 30px;
     }
     .hero-system-row span {
-        border: 1px solid rgba(245, 251, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         background: rgba(255, 255, 255, 0.055);
-        color: rgba(245, 251, 255, 0.74);
+        color: rgba(247, 242, 232, 0.72);
         border-radius: 999px;
-        padding: 8px 12px;
+        padding: 9px 14px;
         font-size: 0.74rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.11em;
         backdrop-filter: blur(12px);
     }
     .hero-kicker {
-        color: var(--teal-hot);
+        display: inline-flex;
+        color: rgba(247, 242, 232, 0.78);
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.075);
+        border-radius: 999px;
+        padding: 9px 18px;
         font-size: 0.78rem;
         font-weight: 850;
-        letter-spacing: 0.16em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        margin-bottom: 12px;
+        margin-bottom: 26px;
     }
     .hero-title {
-        color: #ffffff;
-        font-size: 4.15rem;
+        color: var(--cream);
+        font-size: 3.85rem;
         font-weight: 920;
-        line-height: 0.9;
+        line-height: 0.98;
         max-width: 980px;
         letter-spacing: 0;
-        text-shadow: 0 20px 60px rgba(0, 0, 0, 0.36);
+        margin: 0 auto;
+        text-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
     }
     .hero-title span {
-        color: var(--gold);
+        color: var(--cream);
     }
     .hero-copy {
-        color: rgba(245, 251, 255, 0.76);
-        font-size: 1.02rem;
-        line-height: 1.62;
-        max-width: 820px;
-        margin-top: 18px;
+        color: rgba(247, 242, 232, 0.60);
+        font-size: 1.06rem;
+        line-height: 1.64;
+        max-width: 760px;
+        margin: 24px auto 0;
     }
     .hero-query {
-        margin-top: 18px;
-        border: 1px solid rgba(115, 255, 231, 0.20);
-        background: rgba(3, 10, 13, 0.52);
-        color: rgba(245, 251, 255, 0.76);
-        border-radius: 8px;
-        padding: 11px 14px;
-        max-width: 820px;
+        display: none;
+        margin: 24px auto 0;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.055);
+        color: rgba(247, 242, 232, 0.74);
+        border-radius: 999px;
+        padding: 11px 17px;
+        max-width: 760px;
         font-size: 0.86rem;
         font-weight: 720;
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025);
     }
     .hero-query strong {
-        color: var(--teal-hot);
+        color: var(--teal);
         margin-right: 8px;
     }
     .hero-actions {
@@ -283,25 +278,31 @@ st.markdown(
     .hero-secondary:hover,
     .stButton button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 14px 34px rgba(0,0,0,0.24), 0 0 26px rgba(126,255,229,0.22);
+        border-color: rgba(255, 255, 255, 0.24);
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.120), rgba(255,255,255,0.070));
+        box-shadow: 0 18px 44px rgba(0,0,0,0.20);
     }
     .hero-cta:active,
     .hero-secondary:active,
     .stButton button:active {
         transform: translateY(1px) scale(0.985);
-        box-shadow: 0 0 0 7px rgba(126, 255, 229, 0.13);
+        box-shadow: 0 0 0 6px rgba(247, 242, 232, 0.08);
     }
     .hero-panel {
-        border: 1px solid rgba(245, 251, 255, 0.16);
+        display: none;
+        width: min(980px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         background:
-            linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.035)),
-            rgba(7, 16, 20, 0.52);
+            linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.038)),
+            rgba(36, 33, 29, 0.62);
         border-radius: 8px;
-        padding: 18px;
+        padding: 18px 22px;
         backdrop-filter: blur(12px);
         box-shadow:
-            0 30px 80px rgba(0, 0, 0, 0.28),
+            0 30px 80px rgba(0, 0, 0, 0.22),
             inset 0 0 0 1px rgba(255,255,255,0.035);
+        text-align: left;
     }
     .hero-panel-header {
         display: flex;
@@ -313,14 +314,14 @@ st.markdown(
         margin-bottom: 4px;
     }
     .hero-panel-header .label {
-        color: #ffffff;
+        color: var(--cream);
         font-weight: 850;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-size: 0.78rem;
     }
     .hero-panel-header .status {
-        color: var(--teal-hot);
+        color: var(--teal);
         font-size: 0.72rem;
         font-weight: 840;
         text-transform: uppercase;
@@ -332,41 +333,43 @@ st.markdown(
         gap: 14px;
         padding: 9px 0;
         border-bottom: 1px solid rgba(245, 251, 255, 0.10);
-        color: rgba(245, 251, 255, 0.76);
+        color: rgba(247, 242, 232, 0.66);
         font-size: 0.92rem;
         line-height: 1.55;
     }
     .hero-terminal-line:last-child { border-bottom: 0; }
     .hero-terminal-line strong {
-        color: var(--teal-hot);
+        color: var(--teal);
         font-weight: 850;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         font-size: 0.75rem;
     }
     .hero-metrics {
+        display: none !important;
         position: relative;
         z-index: 1;
-        display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 14px;
-        margin-top: 24px;
+        margin: 30px auto 0;
+        max-width: 1180px;
     }
     .hero-metric {
-        border: 1px solid rgba(245, 251, 255, 0.15);
-        background: linear-gradient(180deg, rgba(255,255,255,0.072), rgba(255,255,255,0.035));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.035));
         border-radius: 8px;
-        padding: 16px;
+        padding: 16px 18px;
         min-height: 72px;
         backdrop-filter: blur(10px);
+        text-align: left;
     }
     .hero-metric .value {
-        color: #ffffff;
+        color: var(--cream);
         font-size: 1.45rem;
         font-weight: 900;
     }
     .hero-metric .label {
-        color: rgba(245,251,255,0.62);
+        color: rgba(247,242,232,0.54);
         font-size: 0.78rem;
         line-height: 1.35;
         margin-top: 5px;
@@ -381,13 +384,14 @@ st.markdown(
         position: relative;
         overflow: hidden;
         display: block;
-        border: 1px solid rgba(10, 24, 29, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.10);
         background:
-            linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(244,248,249,0.98) 100%);
+            linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.035)),
+            var(--panel);
         border-radius: 8px;
-        padding: 20px;
-        min-height: 172px;
-        box-shadow: 0 18px 46px rgba(18, 24, 33, 0.075);
+        padding: 30px 30px 28px;
+        min-height: 250px;
+        box-shadow: none;
         text-decoration: none !important;
         transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
     }
@@ -400,96 +404,130 @@ st.markdown(
         left: 0;
         top: 0;
         width: 100%;
-        height: 3px;
-        background: linear-gradient(90deg, var(--teal), var(--gold), var(--blue));
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+        border: 1px solid rgba(255,255,255,0.10);
+        left: 30px;
+        top: 30px;
     }
     .feature-card:after {
         content: "";
         position: absolute;
-        left: -30%;
-        bottom: 0;
-        width: 60%;
+        left: 30px;
+        top: 48px;
+        width: 20px;
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(16, 191, 174, 0.6), transparent);
-        transition: transform 220ms ease;
+        background: rgba(247, 242, 232, 0.78);
+        box-shadow: 0 8px 0 rgba(247, 242, 232, 0.54), 0 16px 0 rgba(247, 242, 232, 0.30);
+        transition: transform 180ms ease, opacity 180ms ease;
     }
     .feature-card:hover {
         transform: translateY(-4px);
-        border-color: rgba(16, 191, 174, 0.35);
+        border-color: rgba(255, 255, 255, 0.18);
         background:
-            linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(238,248,247,1) 100%);
-        box-shadow: 0 28px 58px rgba(7, 16, 20, 0.14);
+            linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.04)),
+            #2a2722;
+        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.20);
     }
     .feature-card:hover:after {
-        transform: translateX(188%);
+        transform: translateX(4px);
+        opacity: 0.95;
     }
     .feature-card:active {
         transform: translateY(1px) scale(0.99);
         box-shadow: 0 0 0 6px rgba(11, 118, 109, 0.10);
     }
     .feature-index {
-        color: var(--teal);
-        font-size: 0.78rem;
+        color: rgba(247, 242, 232, 0.50);
+        font-size: 0.76rem;
         font-weight: 850;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.10em;
         text-transform: uppercase;
-        margin-bottom: 14px;
+        margin: 80px 0 18px;
     }
     .feature-title {
-        color: var(--ink);
-        font-size: 1.08rem;
+        color: var(--cream);
+        font-size: 1.34rem;
         font-weight: 860;
-        margin-bottom: 10px;
+        margin-bottom: 14px;
     }
     .feature-copy {
-        color: var(--muted);
-        line-height: 1.58;
-        font-size: 0.92rem;
+        color: rgba(247, 242, 232, 0.58);
+        line-height: 1.62;
+        font-size: 1rem;
     }
     .feature-launch-note {
-        color: var(--muted);
+        color: rgba(247, 242, 232, 0.42);
         font-size: 0.82rem;
-        margin: -8px 0 12px;
+        margin: 10px 0 12px;
+        text-align: center;
+    }
+    .capability-header {
+        text-align: center;
+        max-width: 820px;
+        margin: 58px auto 36px;
+    }
+    .capability-header .badge {
+        display: inline-flex;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.07);
+        color: rgba(247,242,232,0.68);
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        margin-bottom: 22px;
+    }
+    .capability-header .title {
+        color: var(--cream);
+        font-size: 3.4rem;
+        line-height: 1.05;
+        font-weight: 880;
+    }
+    .capability-header .copy {
+        color: rgba(247,242,232,0.56);
+        font-size: 1.08rem;
+        line-height: 1.62;
+        margin-top: 18px;
     }
     .console-nav {
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        border: 1px solid rgba(115, 255, 231, 0.18);
-        background:
-            linear-gradient(180deg, rgba(13, 25, 31, 0.94), rgba(7, 14, 18, 0.92));
-        backdrop-filter: blur(16px);
-        border-radius: 8px;
-        padding: 10px;
-        margin: 16px 0;
-        box-shadow: 0 16px 40px rgba(7, 16, 20, 0.17);
+        display: none;
     }
     .workspace-frame {
-        border: 1px solid rgba(7, 16, 20, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.10);
         background:
-            linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,249,0.98));
+            linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.035)),
+            var(--panel);
         border-radius: 8px;
-        padding: 18px;
-        box-shadow: 0 22px 64px rgba(7, 16, 20, 0.12);
-        margin-top: 14px;
+        padding: 20px 22px;
+        box-shadow: none;
+        margin-top: 18px;
     }
     .workspace-frame:before {
         content: "LIVE MODULE";
         display: inline-flex;
-        color: var(--teal);
+        color: rgba(247, 242, 232, 0.48);
         font-weight: 850;
         letter-spacing: 0.14em;
         font-size: 0.72rem;
         margin-bottom: 8px;
     }
     .command-strip {
-        border: 1px solid rgba(115, 255, 231, 0.18);
+        display: none;
+        border: 1px solid rgba(255, 255, 255, 0.10);
         background:
-            linear-gradient(135deg, rgba(8, 18, 23, 0.97), rgba(13, 25, 31, 0.94));
-        border-radius: 8px;
+            linear-gradient(180deg, rgba(255,255,255,0.050), rgba(255,255,255,0.030)),
+            rgba(36, 33, 29, 0.78);
+        border-radius: 999px;
         padding: 12px;
-        margin: 12px 0 14px;
-        box-shadow: 0 18px 44px rgba(7, 16, 20, 0.20);
+        margin: 14px auto 22px;
+        max-width: 1120px;
+        box-shadow: none;
     }
     .command-strip .stTextInput input {
         background: rgba(255,255,255,0.06) !important;
@@ -508,21 +546,21 @@ st.markdown(
     }
     .brand-kicker,
     .terminal-title .eyebrow {
-        color: var(--teal);
+        color: rgba(247, 242, 232, 0.50);
         font-size: 0.78rem;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.12em;
     }
     .brand-title {
-        color: var(--ink);
+        color: var(--cream);
         font-size: 1.75rem;
         font-weight: 780;
         line-height: 1.1;
         margin-top: 6px;
     }
     .brand-subtitle {
-        color: var(--muted);
+        color: rgba(247, 242, 232, 0.56);
         font-size: 0.98rem;
         margin-top: 8px;
         max-width: 760px;
@@ -575,72 +613,120 @@ st.markdown(
     .stNumberInput input,
     .stSelectbox [data-baseweb="select"] > div {
         border-radius: 8px !important;
-        border-color: var(--line) !important;
-        background: rgba(255, 255, 255, 0.94) !important;
+        border-color: rgba(255,255,255,0.12) !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: var(--cream) !important;
         min-height: 48px;
-        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+        box-shadow: none;
+    }
+    div[data-testid="stTextInputRootElement"],
+    div[data-testid="stNumberInput"] div[data-testid="stNumberInputContainer"],
+    div[data-testid="stSelectbox"] div[role="group"] {
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.070), rgba(255,255,255,0.045)) !important;
+        border: 1px solid rgba(255,255,255,0.13) !important;
+        border-radius: 8px !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    }
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stNumberInput"] input,
+    div[data-testid="stSelectbox"] input[role="combobox"],
+    div[data-testid="stSelectbox"] button {
+        background: transparent !important;
+        border-color: rgba(255, 255, 255, 0.14) !important;
+        color: var(--cream) !important;
+    }
+    div[data-testid="stTextInput"] input::placeholder,
+    div[data-testid="stSelectbox"] input::placeholder {
+        color: rgba(247, 242, 232, 0.38) !important;
+    }
+    label[data-testid="stWidgetLabel"],
+    label[data-testid="stWidgetLabel"] *,
+    div[data-testid="stWidgetLabel"],
+    div[data-testid="stWidgetLabel"] * {
+        color: rgba(247, 242, 232, 0.70) !important;
     }
     .stTextInput input:focus,
     .stNumberInput input:focus {
-        border-color: rgba(11, 118, 109, 0.65) !important;
-        box-shadow: 0 0 0 3px rgba(11, 118, 109, 0.12) !important;
+        border-color: rgba(247, 242, 232, 0.42) !important;
+        box-shadow: 0 0 0 3px rgba(247, 242, 232, 0.08) !important;
     }
     .stButton button {
-        min-height: 48px;
+        min-height: 44px;
         width: 100%;
-        border: 1px solid rgba(115, 255, 231, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.13);
         background:
-            linear-gradient(135deg, rgba(115,255,231,0.96), rgba(238,255,251,0.94));
-        color: #031210;
-        box-shadow: 0 12px 30px rgba(16, 191, 174, 0.16);
+            linear-gradient(180deg, rgba(255,255,255,0.080), rgba(255,255,255,0.045));
+        color: rgba(247, 242, 232, 0.84);
+        box-shadow: none;
+        backdrop-filter: blur(12px);
+    }
+    div[data-testid="stButton"] > button,
+    button[data-testid="stBaseButton-secondary"] {
+        color: rgba(247, 242, 232, 0.88) !important;
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.085), rgba(255,255,255,0.050)) !important;
+        border-color: rgba(255,255,255,0.13) !important;
+    }
+    div[data-testid="stButton"] > button *,
+    button[data-testid="stBaseButton-secondary"] * {
+        color: rgba(247, 242, 232, 0.88) !important;
+    }
+    .stButton button p {
+        color: inherit !important;
+        font-weight: 760;
     }
     div[data-testid="stMetric"] {
         background:
-            linear-gradient(180deg, #ffffff 0%, #f7fbfb 100%);
-        border: 1px solid var(--line);
+            linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.035)),
+            var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.10);
         border-radius: 8px;
         padding: 15px 16px;
-        box-shadow: 0 16px 38px rgba(18, 24, 33, 0.075);
+        box-shadow: none;
         animation: liftIn 280ms ease both;
     }
-    div[data-testid="stMetric"] label { color: var(--muted); font-weight: 700; }
-    div[data-testid="stMetricValue"] { color: var(--ink); font-weight: 800; }
+    div[data-testid="stMetric"] label { color: rgba(247,242,232,0.58); font-weight: 700; }
+    div[data-testid="stMetricValue"] { color: var(--cream); font-weight: 800; }
     div[data-testid="stDataFrame"], div[data-testid="stTable"] {
-        border: 1px solid var(--line);
+        border: 1px solid rgba(255,255,255,0.10);
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 10px 26px rgba(18, 24, 33, 0.05);
+        box-shadow: none;
     }
     .terminal-title {
-        border: 1px solid rgba(7, 16, 20, 0.11);
-        border-left: 4px solid var(--teal);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-left: 4px solid rgba(247,242,232,0.40);
         background:
-            linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,249,249,0.98) 100%);
+            linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.035)),
+            var(--panel);
         border-radius: 8px;
         padding: 20px 22px;
         margin-bottom: 18px;
-        box-shadow: 0 18px 42px rgba(18, 24, 33, 0.08);
+        box-shadow: none;
         animation: liftIn 300ms ease both;
     }
     .terminal-title .title {
-        color: var(--ink);
+        color: var(--cream);
         font-size: 1.65rem;
         font-weight: 820;
         line-height: 1.2;
         margin-top: 5px;
     }
     .terminal-title .subtitle {
-        color: var(--muted);
+        color: rgba(247, 242, 232, 0.58);
         margin-top: 6px;
         font-size: 0.98rem;
     }
     .signal-panel {
-        border: 1px solid var(--line);
+        border: 1px solid rgba(255,255,255,0.10);
         border-radius: 8px;
-        background: #ffffff;
+        background:
+            linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.035)),
+            var(--panel);
         padding: 17px 18px;
         margin: 12px 0 18px;
-        box-shadow: 0 18px 42px rgba(18, 24, 33, 0.08);
+        box-shadow: none;
         animation: liftIn 340ms ease both;
     }
     .signal-panel.bullish { border-left: 4px solid var(--teal); }
@@ -663,31 +749,31 @@ st.markdown(
     .bullish .signal-badge { color: var(--teal-dark); background: rgba(11,118,109,0.09); border-color: rgba(11,118,109,0.26); }
     .neutral .signal-badge { color: #7c5619; background: rgba(184,131,36,0.10); border-color: rgba(184,131,36,0.28); }
     .bearish .signal-badge { color: var(--red); background: rgba(179,58,58,0.09); border-color: rgba(179,58,58,0.25); }
-    .signal-headline { color: var(--ink); font-weight: 760; }
+    .signal-headline { color: var(--cream); font-weight: 760; }
     .signal-panel ul {
         margin: 8px 0 0 1.1rem;
         padding: 0;
-        color: #394457;
+        color: rgba(247, 242, 232, 0.66);
         line-height: 1.68;
     }
     .signal-note {
-        color: var(--muted);
+        color: rgba(247, 242, 232, 0.48);
         font-size: 0.84rem;
         margin-top: 10px;
     }
-    .small-note { color: var(--muted); font-size: 0.9rem; }
+    .small-note { color: rgba(247, 242, 232, 0.50); font-size: 0.9rem; }
     [data-testid="stPlotlyChart"] {
-        border: 1px solid var(--line);
-        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 8px;
         padding: 8px;
         background: #ffffff;
-        box-shadow: 0 14px 34px rgba(18, 24, 33, 0.06);
+        box-shadow: none;
     }
     .stAlert {
         border-radius: 8px;
     }
     @media (max-width: 1200px) {
-        .hero-title { font-size: 4.6rem; }
+        .hero-title { font-size: 3.45rem; }
         .home-hero { min-height: auto; }
         .hero-content { grid-template-columns: 1fr; }
     }
@@ -697,7 +783,7 @@ st.markdown(
         .app-shell { padding: 16px; }
         .terminal-title { padding: 17px; }
         .hero-content { grid-template-columns: 1fr; }
-        .hero-title { font-size: 3.05rem; }
+        .hero-title { font-size: 2.45rem; }
         .hero-copy { font-size: 0.98rem; }
         .hero-system-row { margin-bottom: 30px; }
         .hero-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -918,12 +1004,11 @@ def render_home_hero(ticker_count: int) -> None:
             </div>
             <div class="hero-content">
                 <div>
-                    <div class="hero-kicker">Research-grade quant lab</div>
-                    <div class="hero-title">Trade ideas through <span>models, risk, and motion.</span></div>
+                    <div class="hero-kicker">Features</div>
+                    <div class="hero-title">Quant research OS for <span>models, risk, and execution.</span></div>
                     <div class="hero-copy">
-                        A public-facing quantitative research terminal for turning market data into
-                        strategy backtests, technical signal explanations, factor exposures, machine-learning
-                        diagnostics, and option-pricing experiments without leaving the interface.
+                        Explore equities, backtests, risk factors, machine-learning diagnostics,
+                        and derivatives pricing through one public-facing research interface.
                     </div>
                     <div class="hero-query">
                         <strong>TRY</strong> NVDA momentum signal / SPY factor exposure / Black-Scholes Greeks / hedge-frequency error
@@ -1095,7 +1180,7 @@ def render_console_nav(current: str) -> None:
     st.markdown('<nav class="console-nav">', unsafe_allow_html=True)
     columns = st.columns(len(MODULE_NAV))
     for column, (key, (label, _)) in zip(columns, MODULE_NAV.items()):
-        button_label = f"{label} ACTIVE" if key == current else label
+        button_label = label
         with column:
             st.button(button_label, key=f"module_nav_{key}", on_click=set_active_module, args=(key,))
     st.markdown("</nav>", unsafe_allow_html=True)
@@ -1126,11 +1211,6 @@ def render_workspace_frame(module: str) -> None:
 
 
 def render_overview() -> None:
-    render_page_title(
-        "Research Overview",
-        "What This Terminal Does",
-        "A portfolio-grade research interface for equities, factor models, derivatives, and risk attribution.",
-    )
     render_capability_grid()
 
     portfolio = load_portfolio_value()
@@ -1542,10 +1622,7 @@ def render_derivatives_lab() -> None:
 def main() -> None:
     tickers = load_config_tickers()
     module = active_module()
-    render_home_hero(len(tickers))
-    render_hero_controls()
     render_console_nav(module)
-    render_command_search(tickers)
 
     pages = {
         "home": render_overview,
@@ -1556,7 +1633,10 @@ def main() -> None:
         "derivatives": render_derivatives_lab,
         "ai": render_ai_investment_platform,
     }
-    if module != "home":
+    if module == "home":
+        render_home_hero(len(tickers))
+    else:
+        render_command_search(tickers)
         render_workspace_frame(module)
     pages[module]()
 
