@@ -89,6 +89,28 @@ st.markdown(
         background-size: auto;
         color: var(--ink);
     }
+    header[data-testid="stHeader"] {
+        background: #1b1713 !important;
+        border-bottom: 0 !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stDecoration"] {
+        display: none !important;
+    }
+    div[data-testid="stToolbar"],
+    div[data-testid="stToolbar"] > div {
+        background: transparent !important;
+    }
+    div[data-testid="stToolbar"] button,
+    div[data-testid="stToolbar"] svg,
+    div[data-testid="stToolbar"] [role="button"] {
+        color: rgba(247, 242, 232, 0.72) !important;
+        fill: rgba(247, 242, 232, 0.72) !important;
+    }
+    div[data-testid="stToolbar"] button:hover,
+    div[data-testid="stToolbar"] [role="button"]:hover {
+        background: rgba(255, 255, 255, 0.07) !important;
+    }
     .block-container {
         max-width: 1580px;
         padding-top: 1.35rem;
