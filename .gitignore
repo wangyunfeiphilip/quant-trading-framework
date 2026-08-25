@@ -9,6 +9,8 @@ htmlcov/
 venv/
 .env
 *.env
+.streamlit/secrets.toml
+.streamlit-home/
 
 build/
 cmake-build-*/

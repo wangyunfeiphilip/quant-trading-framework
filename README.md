@@ -436,6 +436,8 @@ data/raw/fama_french_daily_factors.csv
 Installation:
 
 ```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -444,6 +446,24 @@ Run the full research pipeline:
 ```bash
 python main.py
 ```
+
+Launch the local research dashboard:
+
+```bash
+streamlit run app.py
+```
+
+Open the local URL printed by Streamlit, usually:
+
+```text
+http://localhost:8501
+```
+
+The dashboard can open before the research pipeline is run, but the stock explorer,
+backtest, risk, factor, and ML pages use the generated files from `data/processed/`
+and `results/`. Run `python main.py` first when you want the full dashboard populated.
+When those generated files are not available in a cloud demo, the app falls back
+to the lightweight `demo_data/` snapshot.
 
 Run tests:
 
@@ -484,6 +504,34 @@ results/monte_carlo_convergence.csv
 results/monte_carlo_convergence.png
 results/delta_hedging_frequency.csv
 results/delta_hedging_frequency.png
+```
+
+## Research Dashboard
+
+The Streamlit dashboard provides a Chinese browser interface for the same research framework:
+
+- search tickers, strategies, metrics, factors, and derivative concepts
+- inspect processed stock features and technical indicators
+- download an external Yahoo Finance ticker on demand from the stock explorer
+- run strategy backtests on the processed feature dataset
+- review risk summaries, factor exposures, parameter sensitivity, and ML diagnostics
+- price European options with Black-Scholes, binomial tree, and Monte Carlo methods
+- inspect saved delta-hedging frequency results
+
+The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible.
+
+Local access through `http://127.0.0.1:8501` only works on the machine running Streamlit. To let other users open the dashboard directly, deploy the repository to Streamlit Community Cloud or another Python app host and set `app.py` as the entry point. On Streamlit Cloud, the public URL can be renamed through the app slug, for example:
+
+```text
+quant-research-terminal.streamlit.app
+```
+
+A custom domain can be used only after deploying the app to a hosting provider that supports domain binding.
+
+Deployment documentation:
+
+```text
+docs/deployment.md
 ```
 
 ## Configuration
