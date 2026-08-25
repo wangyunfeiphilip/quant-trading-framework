@@ -193,9 +193,11 @@ st.markdown(
         margin-top: 24px;
     }
     .hero-cta,
-    .hero-secondary {
+    .hero-secondary,
+    .stButton button {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         border-radius: 999px;
         padding: 11px 16px;
         font-size: 0.9rem;
@@ -214,7 +216,8 @@ st.markdown(
         background: rgba(255,255,255,0.06);
     }
     .hero-cta:hover,
-    .hero-secondary:hover {
+    .hero-secondary:hover,
+    .stButton button:hover {
         transform: translateY(-2px);
         box-shadow: 0 14px 34px rgba(0,0,0,0.24), 0 0 26px rgba(126,255,229,0.22);
     }
@@ -334,14 +337,15 @@ st.markdown(
         line-height: 1.58;
         font-size: 0.92rem;
     }
+    .feature-launch-note {
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin: -8px 0 12px;
+    }
     .console-nav {
         position: sticky;
         top: 0;
         z-index: 10;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        align-items: center;
         border: 1px solid rgba(118, 255, 231, 0.17);
         background: rgba(9, 18, 22, 0.88);
         backdrop-filter: blur(16px);
@@ -349,29 +353,6 @@ st.markdown(
         padding: 10px;
         margin: 16px 0;
         box-shadow: 0 16px 40px rgba(7, 16, 20, 0.17);
-    }
-    .console-nav a {
-        color: rgba(245, 251, 255, 0.74) !important;
-        border: 1px solid rgba(245, 251, 255, 0.10);
-        background: rgba(255, 255, 255, 0.045);
-        border-radius: 999px;
-        padding: 8px 12px;
-        font-size: 0.82rem;
-        font-weight: 790;
-        text-decoration: none !important;
-        transition: transform 160ms ease, color 160ms ease, border-color 160ms ease, background 160ms ease;
-    }
-    .console-nav a:hover {
-        color: #ffffff !important;
-        border-color: rgba(126, 255, 229, 0.35);
-        background: rgba(126, 255, 229, 0.08);
-        transform: translateY(-1px);
-    }
-    .console-nav a.active {
-        color: #06100f !important;
-        background: #7effe5;
-        border-color: #7effe5;
-        box-shadow: 0 0 20px rgba(126, 255, 229, 0.26);
     }
     .workspace-frame {
         border: 1px solid rgba(118, 255, 231, 0.17);
@@ -495,17 +476,11 @@ st.markdown(
     }
     .stButton button {
         min-height: 48px;
-        border-radius: 8px;
-        border: 1px solid var(--line-strong);
-        background: #ffffff;
-        color: var(--ink);
-        font-weight: 750;
-        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-    }
-    .stButton button:hover {
-        transform: translateY(-1px);
-        border-color: rgba(11, 118, 109, 0.45);
-        box-shadow: 0 8px 22px rgba(18, 24, 33, 0.09);
+        width: 100%;
+        border: 1px solid rgba(11, 118, 109, 0.24);
+        background: linear-gradient(135deg, rgba(126,255,229,0.96), rgba(255,255,255,0.94));
+        color: #06100f;
+        box-shadow: 0 10px 26px rgba(11, 118, 109, 0.12);
     }
     div[data-testid="stMetric"] {
         background:
@@ -824,10 +799,6 @@ def render_home_hero(ticker_count: int) -> None:
                         strategy backtests, technical signal explanations, factor exposures, machine-learning
                         diagnostics, and option-pricing experiments.
                     </div>
-                    <div class="hero-actions">
-                        <a class="hero-cta" href="?module=stock#workspace">Open the research terminal</a>
-                        <a class="hero-secondary" href="#module-dock">View capability map</a>
-                    </div>
                 </div>
                 <div class="hero-panel">
                     <div class="hero-terminal-line"><strong>Input</strong><span>OHLCV, adjusted prices, technical features, factor data</span></div>
@@ -848,44 +819,37 @@ def render_home_hero(ticker_count: int) -> None:
     )
 
 
+def render_hero_controls() -> None:
+    col1, col2, col3 = st.columns([1.25, 1.25, 3.5])
+    with col1:
+        st.button("Open Research Terminal", key="hero_open_terminal", on_click=set_active_module, args=("stock",))
+    with col2:
+        st.button("View Capability Map", key="hero_view_map", on_click=set_active_module, args=("home",))
+    with col3:
+        st.markdown(
+            '<div class="feature-launch-note">Module changes happen inside this page. No URL jump, no separate workspace.</div>',
+            unsafe_allow_html=True,
+        )
+
+
 def render_capability_grid() -> None:
-    st.markdown(
-        """
-        <div id="module-dock" class="feature-grid">
-            <a class="feature-card" href="?module=stock#workspace">
-                <div class="feature-index">01 / explore</div>
-                <div class="feature-title">Stock Explorer</div>
-                <div class="feature-copy">Search project names or live Yahoo Finance symbols, inspect technical indicators, and read signal conclusions.</div>
-            </a>
-            <a class="feature-card" href="?module=backtest#workspace">
-                <div class="feature-index">02 / strategies</div>
-                <div class="feature-title">Backtesting Workbench</div>
-                <div class="feature-copy">Compare momentum, mean-reversion, and factor portfolios with transaction costs, slippage, and signal lag.</div>
-            </a>
-            <a class="feature-card" href="?module=risk#workspace">
-                <div class="feature-index">03 / risk</div>
-                <div class="feature-title">Risk Attribution</div>
-                <div class="feature-copy">Inspect Sharpe, drawdown, beta, alpha, tracking error, factor exposures, and parameter sensitivity.</div>
-            </a>
-            <a class="feature-card" href="?module=data#workspace">
-                <div class="feature-index">04 / intelligence</div>
-                <div class="feature-title">Data & ML Diagnostics</div>
-                <div class="feature-copy">Audit data quality and compare chronological return-prediction baselines without look-ahead leakage.</div>
-            </a>
-            <a class="feature-card" href="?module=derivatives#workspace">
-                <div class="feature-index">05 / derivatives</div>
-                <div class="feature-title">Derivatives Lab</div>
-                <div class="feature-copy">Price European options with Black-Scholes, binomial trees, and Monte Carlo variance reduction, then inspect Greeks.</div>
-            </a>
-            <a class="feature-card" href="?module=ai#workspace">
-                <div class="feature-index">06 / research desk</div>
-                <div class="feature-title">AI Research Desk</div>
-                <div class="feature-copy">Track single-name theses, factor scores, valuation scenarios, risk notes, and behavior feedback.</div>
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div id="module-dock"></div>', unsafe_allow_html=True)
+    for row_start in range(0, len(FEATURE_MODULES), 3):
+        columns = st.columns(3)
+        for column, feature in zip(columns, FEATURE_MODULES[row_start : row_start + 3]):
+            key, index, title, copy = feature
+            with column:
+                st.markdown(
+                    f"""
+                    <div class="feature-card">
+                        <div class="feature-index">{escape(index)}</div>
+                        <div class="feature-title">{escape(title)}</div>
+                        <div class="feature-copy">{escape(copy)}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.button(f"Launch {title}", key=f"feature_launch_{key}", on_click=set_active_module, args=(key,))
 
 
 def render_signal_card(summary) -> None:
@@ -939,21 +903,69 @@ MODULE_NAV = {
 }
 
 
+FEATURE_MODULES = [
+    (
+        "stock",
+        "01 / explore",
+        "Stock Explorer",
+        "Search project names or live Yahoo Finance symbols, inspect technical indicators, and read signal conclusions.",
+    ),
+    (
+        "backtest",
+        "02 / strategies",
+        "Backtesting Workbench",
+        "Compare momentum, mean-reversion, and factor portfolios with transaction costs, slippage, and signal lag.",
+    ),
+    (
+        "risk",
+        "03 / risk",
+        "Risk Attribution",
+        "Inspect Sharpe, drawdown, beta, alpha, tracking error, factor exposures, and parameter sensitivity.",
+    ),
+    (
+        "data",
+        "04 / intelligence",
+        "Data & ML Diagnostics",
+        "Audit data quality and compare chronological return-prediction baselines without look-ahead leakage.",
+    ),
+    (
+        "derivatives",
+        "05 / derivatives",
+        "Derivatives Lab",
+        "Price European options with Black-Scholes, binomial trees, and Monte Carlo variance reduction, then inspect Greeks.",
+    ),
+    (
+        "ai",
+        "06 / research desk",
+        "AI Research Desk",
+        "Track single-name theses, factor scores, valuation scenarios, risk notes, and behavior feedback.",
+    ),
+]
+
+
+def initialize_module_state() -> None:
+    if "active_module" not in st.session_state:
+        st.session_state["active_module"] = "home"
+
+
+def set_active_module(module: str) -> None:
+    st.session_state["active_module"] = module if module in MODULE_NAV else "home"
+
+
 def active_module() -> str:
-    module = st.query_params.get("module", "home")
+    initialize_module_state()
+    module = st.session_state.get("active_module", "home")
     return module if module in MODULE_NAV else "home"
 
 
-def module_url(module: str) -> str:
-    return f"?module={module}#workspace" if module != "home" else "?module=home#module-dock"
-
-
 def render_console_nav(current: str) -> None:
-    links = []
-    for key, (label, _) in MODULE_NAV.items():
-        active = " active" if key == current else ""
-        links.append(f'<a class="{active.strip()}" href="{module_url(key)}">{escape(label)}</a>')
-    st.markdown(f'<nav class="console-nav">{"".join(links)}</nav>', unsafe_allow_html=True)
+    st.markdown('<nav class="console-nav">', unsafe_allow_html=True)
+    columns = st.columns(len(MODULE_NAV))
+    for column, (key, (label, _)) in zip(columns, MODULE_NAV.items()):
+        button_label = f"{label} / active" if key == current else label
+        with column:
+            st.button(button_label, key=f"module_nav_{key}", on_click=set_active_module, args=(key,))
+    st.markdown("</nav>", unsafe_allow_html=True)
 
 
 def render_command_search(tickers: list[str]) -> None:
@@ -1398,6 +1410,7 @@ def main() -> None:
     tickers = load_config_tickers()
     module = active_module()
     render_home_hero(len(tickers))
+    render_hero_controls()
     render_console_nav(module)
     render_command_search(tickers)
 
