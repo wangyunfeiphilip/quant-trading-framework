@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import re
 import json
+import os
+import shutil
+import tempfile
 from html import escape
 from pathlib import Path
 import sys
@@ -22,10 +25,16 @@ from dashboard.search import build_search_index, search_catalog
 from dashboard.technical_summary import generate_technical_summary
 from data.data_loader import (
     DEFAULT_TICKERS,
+    MarketDataConfig,
+    build_market_dataset,
     clean_price_data,
     create_feature_dataset,
     download_price_data,
+    expected_latest_market_date,
+    latest_market_date,
     load_fundamental_features,
+    market_dataset_is_stale,
+    next_yfinance_end_date,
 )
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
 from derivatives.numerical_methods import binomial_option_price, monte_carlo_option_price
@@ -38,6 +47,7 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 INVESTMENT_RESULTS_DIR = RESULTS_DIR / "investment_platform"
 DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
+AUTO_REFRESH_DATA = os.getenv("QTF_AUTO_REFRESH_DATA", "1").strip().lower() not in {"0", "false", "no"}
 
 
 st.set_page_config(
@@ -873,6 +883,107 @@ def load_features() -> pd.DataFrame:
     return frame.sort_values(["date", "ticker"]).reset_index(drop=True)
 
 
+def clear_project_data_cache() -> None:
+    """Clear cached dashboard reads after the processed dataset is rebuilt."""
+
+    read_csv.clear()
+    load_features.clear()
+
+
+def refresh_project_market_data(tickers: list[str], start: str) -> pd.DataFrame:
+    """Rebuild the local project universe dataset from yfinance."""
+
+    with tempfile.TemporaryDirectory(prefix="qtf_market_refresh_") as tmp:
+        tmp_root = Path(tmp)
+        config = MarketDataConfig(
+            tickers=tuple(tickers),
+            start=start,
+            end=next_yfinance_end_date(),
+            raw_dir=tmp_root / "raw",
+            processed_dir=tmp_root / "processed",
+        )
+        refreshed = build_market_dataset(config)
+
+        ticker_count = refreshed["ticker"].nunique() if "ticker" in refreshed.columns else 0
+        minimum_coverage = max(1, int(len(tickers) * 0.90))
+        if ticker_count < minimum_coverage:
+            raise ValueError(f"downloaded {ticker_count}/{len(tickers)} tickers; keeping the existing dataset")
+
+        if market_dataset_is_stale(refreshed):
+            latest = latest_market_date(refreshed)
+            raise ValueError(f"latest downloaded date is {latest.date() if latest is not None else 'missing'}")
+
+        PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+        for csv_file in (tmp_root / "processed").glob("*.csv"):
+            shutil.copy2(csv_file, PROCESSED_DIR / csv_file.name)
+
+        raw_dir = PROJECT_ROOT / "data" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        for csv_file in (tmp_root / "raw").glob("*.csv"):
+            shutil.copy2(csv_file, raw_dir / csv_file.name)
+
+    clear_project_data_cache()
+    return refreshed
+
+
+def maybe_auto_refresh_project_data(tickers: list[str], start: str, features: pd.DataFrame) -> pd.DataFrame:
+    """Refresh stale project data once per browser session."""
+
+    if not AUTO_REFRESH_DATA or not market_dataset_is_stale(features):
+        return features
+
+    latest = latest_market_date(features)
+    expected = expected_latest_market_date()
+    refresh_key = f"{latest.date() if latest is not None else 'missing'}->{expected.date()}"
+    if st.session_state.get("project_data_refresh_attempt") == refresh_key:
+        return features
+
+    st.session_state["project_data_refresh_attempt"] = refresh_key
+    with st.spinner("Refreshing project market data from yfinance..."):
+        try:
+            refreshed = refresh_project_market_data(tickers, start)
+        except Exception as exc:
+            st.session_state["project_data_refresh_error"] = str(exc)
+            return features
+
+    st.session_state["project_data_refresh_error"] = ""
+    st.session_state["project_data_refresh_success"] = latest_market_date(refreshed)
+    st.toast("Project market data refreshed.")
+    return load_features()
+
+
+def render_project_data_status(features: pd.DataFrame, tickers: list[str], start: str) -> pd.DataFrame:
+    """Show project data freshness and expose a manual rebuild button."""
+
+    latest = latest_market_date(features)
+    expected = expected_latest_market_date()
+    stale = market_dataset_is_stale(features)
+
+    status_text = (
+        f"Project dataset latest date: {latest.date() if latest is not None else 'missing'}; "
+        f"expected latest closed business date: {expected.date()}."
+    )
+    if stale:
+        st.warning(f"{status_text} Local data may be stale.")
+    else:
+        st.caption(f"{status_text} Data is current enough for daily research.")
+
+    if st.session_state.get("project_data_refresh_error"):
+        st.caption(f"Last automatic refresh failed: {st.session_state['project_data_refresh_error']}")
+
+    if st.button("Refresh project dataset from yfinance", key="refresh_project_dataset"):
+        with st.spinner("Rebuilding project universe data, fundamentals, and technical features..."):
+            try:
+                refreshed = refresh_project_market_data(tickers, start)
+            except Exception as exc:
+                st.error(f"Project dataset refresh failed: {exc}")
+                return features
+        st.success(f"Project dataset refreshed through {latest_market_date(refreshed).date()}.")
+        return load_features()
+
+    return features
+
+
 def normalize_ticker(value: str) -> str:
     ticker = re.sub(r"[^A-Za-z0-9.^=-]", "", value).upper()
     if re.fullmatch(r"\d{6}", ticker):
@@ -1375,6 +1486,7 @@ def render_stock_explorer(tickers: list[str]) -> None:
     data_config = config.get("data", {})
     start = data_config.get("start", "2015-01-01")
     end = data_config.get("end", "2026-12-31")
+    features = render_project_data_status(features, tickers, start)
 
     if features.empty:
         render_missing_results()
@@ -1644,6 +1756,8 @@ def render_derivatives_lab() -> None:
 def main() -> None:
     tickers = load_config_tickers()
     module = active_module()
+    data_config = load_dashboard_config().get("data", {})
+    maybe_auto_refresh_project_data(tickers, data_config.get("start", "2015-01-01"), load_features())
     render_console_nav(module)
 
     pages = {

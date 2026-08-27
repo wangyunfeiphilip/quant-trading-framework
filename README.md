@@ -462,8 +462,11 @@ http://localhost:8501
 The dashboard can open before the research pipeline is run, but the stock explorer,
 backtest, risk, factor, and ML pages use the generated files from `data/processed/`
 and `results/`. Run `python main.py` first when you want the full dashboard populated.
-When those generated files are not available in a cloud demo, the app falls back
-to the lightweight `demo_data/` snapshot.
+The dashboard checks whether the project market dataset is older than the latest
+closed US business day and can refresh it from yfinance on startup or through the
+Stock Explorer refresh control. Set `QTF_AUTO_REFRESH_DATA=0` to disable startup
+refresh attempts. When generated files are not available in a cloud demo, the app
+falls back to the lightweight `demo_data/` snapshot.
 
 Run tests:
 
@@ -508,7 +511,7 @@ results/delta_hedging_frequency.png
 
 ## Research Dashboard
 
-The Streamlit dashboard provides a Chinese browser interface for the same research framework:
+The Streamlit dashboard provides a public-facing research interface for the same framework:
 
 - search tickers, strategies, metrics, factors, and derivative concepts
 - inspect processed stock features and technical indicators
@@ -518,7 +521,7 @@ The Streamlit dashboard provides a Chinese browser interface for the same resear
 - price European options with Black-Scholes, binomial tree, and Monte Carlo methods
 - inspect saved delta-hedging frequency results
 
-The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible.
+The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible. If local project data is stale, the dashboard attempts one safe refresh per browser session and keeps the previous dataset if the data provider fails.
 
 Local access through `http://127.0.0.1:8501` only works on the machine running Streamlit. To let other users open the dashboard directly, deploy the repository to Streamlit Community Cloud or another Python app host and set `app.py` as the entry point. On Streamlit Cloud, the public URL can be renamed through the app slug, for example:
 

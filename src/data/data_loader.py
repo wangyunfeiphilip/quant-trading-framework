@@ -357,6 +357,40 @@ def create_feature_dataset(
     return features
 
 
+def expected_latest_market_date(today: str | pd.Timestamp | None = None) -> pd.Timestamp:
+    """Return the latest fully closed US equity business date expected in local data."""
+
+    current = pd.Timestamp.today().normalize() if today is None else pd.Timestamp(today).normalize()
+    return (current - pd.tseries.offsets.BDay(1)).normalize()
+
+
+def next_yfinance_end_date(today: str | pd.Timestamp | None = None) -> str:
+    """Return a yfinance end date that includes the current calendar day when available."""
+
+    current = pd.Timestamp.today().normalize() if today is None else pd.Timestamp(today).normalize()
+    return (current + pd.DateOffset(days=1)).strftime("%Y-%m-%d")
+
+
+def latest_market_date(data: pd.DataFrame) -> pd.Timestamp | None:
+    """Return the most recent market date in a price or feature frame."""
+
+    if data.empty or "date" not in data.columns:
+        return None
+    dates = pd.to_datetime(data["date"], errors="coerce").dropna()
+    if dates.empty:
+        return None
+    return dates.max().normalize()
+
+
+def market_dataset_is_stale(data: pd.DataFrame, today: str | pd.Timestamp | None = None) -> bool:
+    """Check whether local market data is older than the latest closed business day."""
+
+    latest = latest_market_date(data)
+    if latest is None:
+        return True
+    return latest < expected_latest_market_date(today)
+
+
 def build_market_dataset(config: MarketDataConfig = MarketDataConfig()) -> pd.DataFrame:
     """Run the full data pipeline and save raw, clean, and feature datasets."""
 
