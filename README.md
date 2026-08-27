@@ -466,7 +466,9 @@ The dashboard checks whether the project market dataset is older than the latest
 closed US business day and can refresh it from yfinance on startup or through the
 Stock Explorer refresh control. Set `QTF_AUTO_REFRESH_DATA=0` to disable startup
 refresh attempts. When generated files are not available in a cloud demo, the app
-falls back to the lightweight `demo_data/` snapshot.
+falls back to the lightweight `demo_data/` snapshot. Streamlit Cloud uses
+`runtime.txt` to run the public demo on Python 3.11, matching the project target
+environment.
 
 Run tests:
 
