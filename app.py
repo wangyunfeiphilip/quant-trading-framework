@@ -30,11 +30,7 @@ from data.data_loader import (
     clean_price_data,
     create_feature_dataset,
     download_price_data,
-    expected_latest_market_date,
-    latest_market_date,
     load_fundamental_features,
-    market_dataset_is_stale,
-    next_yfinance_end_date,
 )
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
 from derivatives.numerical_methods import binomial_option_price, monte_carlo_option_price
@@ -42,6 +38,39 @@ from risk.risk_metrics import maximum_drawdown, performance_summary
 from strategies.factor_strategy import generate_factor_weights
 from strategies.mean_reversion import generate_mean_reversion_weights
 from strategies.momentum import generate_momentum_weights
+
+try:
+    from data.data_loader import (
+        expected_latest_market_date,
+        latest_market_date,
+        market_dataset_is_stale,
+        next_yfinance_end_date,
+    )
+except ImportError:  # pragma: no cover - defensive path for stale cloud builds
+    def expected_latest_market_date(today: str | pd.Timestamp | None = None) -> pd.Timestamp:
+        reference = pd.Timestamp.today().normalize() if today is None else pd.Timestamp(today).normalize()
+        if reference.weekday() == 5:
+            return reference - pd.Timedelta(days=1)
+        if reference.weekday() == 6:
+            return reference - pd.Timedelta(days=2)
+        return reference
+
+    def next_yfinance_end_date(today: str | pd.Timestamp | None = None) -> str:
+        return (expected_latest_market_date(today) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    def latest_market_date(data: pd.DataFrame) -> pd.Timestamp | None:
+        if data.empty or "date" not in data.columns:
+            return None
+        dates = pd.to_datetime(data["date"], errors="coerce").dropna()
+        if dates.empty:
+            return None
+        return dates.max().normalize()
+
+    def market_dataset_is_stale(data: pd.DataFrame, today: str | pd.Timestamp | None = None) -> bool:
+        latest = latest_market_date(data)
+        if latest is None:
+            return True
+        return latest < expected_latest_market_date(today)
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"

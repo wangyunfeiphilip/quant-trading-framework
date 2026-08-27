@@ -8,8 +8,12 @@ from data.data_loader import (
     clean_price_data,
     create_feature_dataset,
     download_price_data,
+    expected_latest_market_date,
     generate_data_quality_report,
+    latest_market_date,
     load_fundamental_features,
+    market_dataset_is_stale,
+    next_yfinance_end_date,
 )
 
 __all__ = [
@@ -20,6 +24,10 @@ __all__ = [
     "clean_price_data",
     "create_feature_dataset",
     "download_price_data",
+    "expected_latest_market_date",
     "generate_data_quality_report",
+    "latest_market_date",
     "load_fundamental_features",
+    "market_dataset_is_stale",
+    "next_yfinance_end_date",
 ]
