@@ -7,9 +7,11 @@ import json
 import os
 import shutil
 import tempfile
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 import sys
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -1474,14 +1476,25 @@ def normalize_ticker(value: str) -> str:
     return ticker
 
 
-@st.cache_data(show_spinner=True, ttl=3600)
-def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
+@st.cache_data(show_spinner=False, ttl=15)
+def load_external_ticker_prices(ticker: str, start: str, end: str) -> pd.DataFrame:
     raw = download_price_data([ticker], start=start, end=end, raw_dir=None)
     if raw.empty:
         raise ValueError("data provider returned no price rows")
+    return raw
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_external_ticker_fundamentals(ticker: str) -> pd.DataFrame:
+    return load_fundamental_features([ticker])
+
+
+@st.cache_data(show_spinner=False, ttl=15)
+def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
+    raw = load_external_ticker_prices(ticker, start=start, end=end)
 
     clean = clean_price_data(raw)
-    fundamentals = load_fundamental_features([ticker])
+    fundamentals = load_external_ticker_fundamentals(ticker)
     features = create_feature_dataset(clean, fundamentals=fundamentals)
     features["date"] = pd.to_datetime(features["date"])
     return features.sort_values(["date", "ticker"]).reset_index(drop=True)
@@ -2013,54 +2026,14 @@ def render_ai_investment_platform() -> None:
             st.markdown(report)
 
 
-def render_stock_explorer(tickers: list[str]) -> None:
-    render_page_title(
-        "Single Name Explorer",
-        "Stock Explorer",
-        "Inspect prices, technical indicators, return windows, and risk characteristics for project tickers or any Yahoo Finance symbol.",
-    )
-    features = load_features()
-    config = load_dashboard_config()
-    data_config = config.get("data", {})
-    start = data_config.get("start", "2015-01-01")
-    end = data_config.get("end", "2026-12-31")
-    features = render_project_data_status(features, tickers, start)
+def market_timestamp() -> datetime:
+    try:
+        return datetime.now(ZoneInfo("America/New_York"))
+    except Exception:  # pragma: no cover - timezone database fallback
+        return datetime.now(timezone.utc)
 
-    if features.empty:
-        render_missing_results()
-        return
 
-    col1, col2, col3 = st.columns([1, 2, 0.6])
-    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
-    external = normalize_ticker(
-        col2.text_input(
-            "Live Ticker Lookup",
-            placeholder="Enter a Yahoo Finance symbol, e.g. PLTR, TSM, BABA, 0700.HK, 301321",
-        )
-    )
-    refresh_external = col3.button("Refresh", disabled=not bool(external))
-    if refresh_external:
-        load_external_ticker_features.clear()
-
-    ticker = external or selected
-    use_external = bool(external and external not in set(tickers))
-
-    if use_external:
-        try:
-            with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
-                stock = load_external_ticker_features(ticker, start=start, end=end)
-        except Exception:
-            st.error(f"Yahoo Finance did not return usable data for {ticker}. Check the symbol or try again later.")
-            st.caption(
-                "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
-                "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
-            )
-            return
-        source_label = "Live yfinance lookup"
-    else:
-        stock = features[features["ticker"].eq(ticker)].copy()
-        source_label = "Processed project dataset"
-
+def render_ticker_analysis(stock: pd.DataFrame, ticker: str, source_label: str) -> None:
     if stock.empty:
         st.warning(f"No market data was found for {ticker}. Check the ticker symbol and try again.")
         return
@@ -2126,6 +2099,65 @@ def render_stock_explorer(tickers: list[str]) -> None:
     ]
     shown = [column for column in indicator_cols if column in stock.columns]
     st.dataframe(stock[["date", "ticker", *shown]].tail(30), width="stretch", hide_index=True)
+
+
+@st.fragment(run_every="15s")
+def render_live_ticker_result(ticker: str, start: str, end: str) -> None:
+    try:
+        with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
+            stock = load_external_ticker_features(ticker, start=start, end=end)
+    except Exception:
+        st.caption(f"LIVE · Last updated: {market_timestamp().strftime('%H:%M:%S %Z')}")
+        st.error(f"Yahoo Finance did not return usable data for {ticker}. Check the symbol or try again later.")
+        st.caption(
+            "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
+            "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
+        )
+        return
+
+    st.caption(f"LIVE · Last updated: {market_timestamp().strftime('%H:%M:%S %Z')}")
+    render_ticker_analysis(stock, ticker, "Live yfinance lookup")
+
+
+def render_stock_explorer(tickers: list[str]) -> None:
+    render_page_title(
+        "Single Name Explorer",
+        "Stock Explorer",
+        "Inspect prices, technical indicators, return windows, and risk characteristics for project tickers or any Yahoo Finance symbol.",
+    )
+    features = load_features()
+    config = load_dashboard_config()
+    data_config = config.get("data", {})
+    start = data_config.get("start", "2015-01-01")
+    end = data_config.get("end", "2026-12-31")
+    features = render_project_data_status(features, tickers, start)
+
+    if features.empty:
+        render_missing_results()
+        return
+
+    col1, col2, col3 = st.columns([1, 2, 0.6])
+    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
+    external = normalize_ticker(
+        col2.text_input(
+            "Live Ticker Lookup",
+            placeholder="Enter a Yahoo Finance symbol, e.g. PLTR, TSM, BABA, 0700.HK, 301321",
+        )
+    )
+    refresh_external = col3.button("Refresh", disabled=not bool(external))
+    if refresh_external:
+        load_external_ticker_prices.clear()
+        load_external_ticker_features.clear()
+
+    ticker = external or selected
+    use_external = bool(external)
+
+    if use_external:
+        render_live_ticker_result(ticker, start, end)
+        return
+
+    stock = features[features["ticker"].eq(ticker)].copy()
+    render_ticker_analysis(stock, ticker, "Processed project dataset")
 
 
 def strategy_weights(features: pd.DataFrame, strategy: str, top_n: int, entry_z: float) -> pd.DataFrame:
