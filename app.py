@@ -83,6 +83,7 @@ st.set_page_config(
     page_title="Quant Research Terminal",
     page_icon="Q",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
@@ -863,21 +864,21 @@ st.markdown(
     """
     <style>
     :root {
-        --qtf-paper: #f4f3ee;
-        --qtf-white: #ffffff;
-        --qtf-ink: #151515;
-        --qtf-muted: #77756d;
-        --qtf-line: rgba(21, 21, 21, 0.15);
+        --qtf-paper: #1b1713;
+        --qtf-white: #2a2722;
+        --qtf-ink: #f8f6ef;
+        --qtf-muted: #b0aaa1;
+        --qtf-line: rgba(255, 255, 255, 0.14);
         --qtf-black: #090909;
         --qtf-accent: #d8bb66;
     }
 
     html, body, .stApp, [data-testid="stAppViewContainer"] {
         background: var(--qtf-paper) !important;
-        color: var(--qtf-ink) !important;
+        color: var(--qtf-accent) !important;
     }
     header[data-testid="stHeader"] {
-        background: rgba(244, 243, 238, 0.96) !important;
+        background: rgba(27, 23, 19, 0.96) !important;
         border-bottom: 1px solid var(--qtf-line) !important;
         box-shadow: none !important;
     }
@@ -893,15 +894,18 @@ st.markdown(
     }
 
     [data-testid="stSidebar"] {
-        background: #efeee8 !important;
+        display: block !important;
+        visibility: visible !important;
+        background: #10141b !important;
         border-right: 1px solid var(--qtf-line) !important;
         box-shadow: none !important;
     }
+    [data-testid="stSidebar"] > div:first-child { width: 18rem !important; }
     [data-testid="stSidebar"] * { color: var(--qtf-ink) !important; }
     [data-testid="stSidebar"] .sidebar-brand {
         background: transparent !important;
         border: 0 !important;
-        border-bottom: 1px solid var(--qtf-line) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.14) !important;
         border-radius: 0 !important;
         padding: 10px 0 20px !important;
         margin: 0 0 18px !important;
@@ -910,8 +914,8 @@ st.markdown(
         width: 30px !important;
         height: 30px !important;
         border-radius: 4px !important;
-        background: var(--qtf-black) !important;
-        color: #fff !important;
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
         font-size: 0.68rem !important;
     }
     [data-testid="stSidebar"] .sidebar-name {
@@ -928,14 +932,14 @@ st.markdown(
         transition: background 160ms ease, transform 160ms ease !important;
     }
     [data-testid="stSidebar"] [role="radiogroup"] label:hover {
-        background: rgba(21, 21, 21, 0.06) !important;
+        background: rgba(216, 187, 102, 0.12) !important;
         transform: translateX(2px);
     }
     [data-testid="stSidebar"] [role="radiogroup"] label[data-checked="true"] {
-        background: var(--qtf-black) !important;
-        color: #fff !important;
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
     }
-    [data-testid="stSidebar"] [role="radiogroup"] label[data-checked="true"] * { color: #fff !important; }
+    [data-testid="stSidebar"] [role="radiogroup"] label[data-checked="true"] * { color: #15120e !important; }
 
     .console-nav {
         background: transparent !important;
@@ -953,8 +957,8 @@ st.markdown(
     }
     .console-nav a:hover, .console-nav button:hover,
     .console-nav a.active, .console-nav button.active {
-        background: var(--qtf-black) !important;
-        color: #fff !important;
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
         transform: translateY(-1px);
     }
 
@@ -972,7 +976,7 @@ st.markdown(
         letter-spacing: 0.16em !important;
     }
     .terminal-title .title {
-        color: var(--qtf-ink) !important;
+        color: var(--qtf-accent) !important;
         font-size: clamp(2.4rem, 5vw, 5.6rem) !important;
         line-height: 0.98 !important;
         font-weight: 750 !important;
@@ -995,13 +999,13 @@ st.markdown(
         letter-spacing: 0 !important;
         font-weight: 780 !important;
     }
-    .hero-title span { color: #9a7920 !important; }
+    .hero-title span { color: var(--qtf-accent) !important; }
     .hero-copy { color: var(--qtf-muted) !important; max-width: 760px !important; }
     .hero-panel {
         background: var(--qtf-black) !important;
         border: 1px solid #323232 !important;
         border-radius: 8px !important;
-        color: #fff !important;
+        color: var(--qtf-ink) !important;
         box-shadow: none !important;
     }
     .hero-panel * { color: inherit; }
@@ -1014,7 +1018,7 @@ st.markdown(
         border-radius: 0 !important;
         padding: 18px 12px 0 0 !important;
     }
-    .hero-metric .metric-value { color: var(--qtf-ink) !important; }
+    .hero-metric .metric-value { color: var(--qtf-accent) !important; }
     .hero-metric .metric-label { color: var(--qtf-muted) !important; }
 
     .feature-grid {
@@ -1045,7 +1049,7 @@ st.markdown(
         color: #fff !important;
         box-shadow: none !important;
     }
-    .workspace-frame:before { color: rgba(255,255,255,0.46) !important; }
+    .workspace-frame:before { color: rgba(216,187,102,0.78) !important; }
     h1, h2, h3, h4, p, label, .stMarkdown { color: var(--qtf-ink); }
     [data-testid="stMetric"] {
         background: var(--qtf-white) !important;
@@ -1053,22 +1057,46 @@ st.markdown(
         border-radius: 4px !important;
         box-shadow: none !important;
     }
+    [data-testid="stMetric"] label,
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: var(--qtf-accent) !important;
+    }
     [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
     [data-testid="stSelectbox"] > div {
         background: var(--qtf-white) !important;
         border-color: var(--qtf-line) !important;
         border-radius: 4px !important;
+        color: var(--qtf-ink) !important;
+    }
+    [data-testid="stTextInput"] input::placeholder {
+        color: rgba(248,246,239,0.55) !important;
     }
     .stButton > button, .stDownloadButton > button {
-        background: var(--qtf-black) !important;
-        color: #fff !important;
-        border: 1px solid var(--qtf-black) !important;
+        background: var(--qtf-white) !important;
+        color: var(--qtf-accent) !important;
+        border: 1px solid var(--qtf-line) !important;
         border-radius: 4px !important;
         transition: transform 160ms ease, background 160ms ease !important;
     }
     .stButton > button:hover, .stDownloadButton > button:hover {
-        background: #333 !important;
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
         transform: translateY(-1px);
+    }
+    .stButton > button *, .stDownloadButton > button * {
+        color: var(--qtf-accent) !important;
+    }
+    .stButton > button:hover *, .stDownloadButton > button:hover * {
+        color: #15120e !important;
+    }
+    [data-baseweb="popover"], [role="listbox"] {
+        background: #2a2722 !important;
+        border: 1px solid var(--qtf-line) !important;
+    }
+    [role="option"] { color: var(--qtf-ink) !important; }
+    [role="option"][aria-selected="true"] {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
     }
     [data-testid="stDataFrame"], [data-testid="stPlotlyChart"] {
         background: var(--qtf-white) !important;
@@ -1092,6 +1120,10 @@ st.markdown(
         background: var(--qtf-black) !important;
         color: var(--qtf-accent) !important;
     }
+    .back-home-row .stButton > button * {
+        color: var(--qtf-accent) !important;
+    }
+    .back-home-row .stButton > button:hover * { color: #15120e !important; }
 
     @media (max-width: 900px) {
         .block-container { padding: 0.75rem 1rem 3rem !important; }
