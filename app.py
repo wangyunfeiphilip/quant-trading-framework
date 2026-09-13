@@ -1125,6 +1125,116 @@ st.markdown(
     }
     .back-home-row .stButton > button:hover * { color: #15120e !important; }
 
+    /* Streamlit widget text needs explicit contrast because the legacy theme
+       styles several nested elements with white !important. */
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stMarkdownContainer"] p,
+    .stApp [data-testid="stMarkdownContainer"] li,
+    .stApp [data-testid="stCaptionContainer"] *,
+    .stApp [data-testid="stText"] {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stCaptionContainer"] * {
+        color: #8b701d !important;
+    }
+    .stApp .stButton > button,
+    .stApp .stButton > button *,
+    .stApp .stDownloadButton > button,
+    .stApp .stDownloadButton > button * {
+        color: #8b701d !important;
+        text-shadow: none !important;
+    }
+    .stApp .stButton > button,
+    .stApp .stDownloadButton > button {
+        background: transparent !important;
+        border: 1px solid rgba(139,112,29,0.42) !important;
+    }
+    .stApp .stButton > button:hover,
+    .stApp .stButton > button:hover *,
+    .stApp .stDownloadButton > button:hover,
+    .stApp .stDownloadButton > button:hover * {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
+    }
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stApp [data-testid="stTextInput"] input,
+    .stApp [data-testid="stNumberInput"] input {
+        background: #ffffff !important;
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] *,
+    .stApp [data-testid="stTextInput"] input,
+    .stApp [data-testid="stNumberInput"] input {
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stTextInput"] input::placeholder,
+    .stApp [data-testid="stNumberInput"] input::placeholder,
+    .stApp [data-testid="stSelectbox"] input::placeholder {
+        color: var(--qtf-muted) !important;
+        -webkit-text-fill-color: var(--qtf-muted) !important;
+        opacity: 1 !important;
+    }
+    .stApp [data-testid="stSelectbox"] svg,
+    .stApp [data-testid="stNumberInput"] svg,
+    .stApp [data-testid="stTextInput"] svg {
+        fill: var(--qtf-ink) !important;
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-baseweb="popover"],
+    .stApp [role="listbox"] {
+        background: #ffffff !important;
+    }
+    .stApp [role="option"],
+    .stApp [role="option"] * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [role="option"][aria-selected="true"],
+    .stApp [role="option"][aria-selected="true"] * {
+        background: #efe5c6 !important;
+        color: #6f5714 !important;
+    }
+    .stApp .feature-card {
+        background: var(--qtf-paper) !important;
+        border: 1px solid rgba(139,112,29,0.32) !important;
+        border-top: 2px solid var(--qtf-accent) !important;
+        box-shadow: 0 8px 24px rgba(21,21,21,0.05) !important;
+    }
+    .stApp .feature-card *,
+    .stApp .feature-card .feature-title,
+    .stApp .feature-card .feature-copy,
+    .stApp .feature-card .feature-index {
+        color: #8b701d !important;
+    }
+    .stApp .workspace-frame {
+        background: transparent !important;
+        border: 1px solid var(--qtf-line) !important;
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stAlert"],
+    .stApp .stAlert,
+    .stApp [data-testid="stAlert"] * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stExpander"] summary,
+    .stApp [data-testid="stExpander"] summary * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stRadio"] label,
+    .stApp [data-testid="stRadio"] label * ,
+    .stApp [data-testid="stCheckbox"] label,
+    .stApp [data-testid="stCheckbox"] label * ,
+    .stApp [data-testid="stSlider"] label,
+    .stApp [data-testid="stSlider"] label * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stDataFrame"] *,
+    .stApp [data-testid="stTable"] * {
+        color: var(--qtf-ink) !important;
+    }
+
     @media (max-width: 900px) {
         .block-container { padding: 0.75rem 1rem 3rem !important; }
         .hero-content { grid-template-columns: 1fr !important; gap: 28px !important; }
