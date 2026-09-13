@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import time
+import inspect
 import logging
+import threading
 
 import numpy as np
 import pandas as pd
@@ -73,6 +75,8 @@ DEFAULT_TICKERS = (
     "SPY",
 )
 PRICE_COLUMNS = ("open", "high", "low", "close", "adj_close", "volume")
+YFINANCE_DOWNLOAD_TIMEOUT = 30
+YFINANCE_INFO_TIMEOUT = 15
 
 
 @dataclass(frozen=True)
@@ -113,13 +117,24 @@ def _download_to_long_frame(downloaded: pd.DataFrame, tickers: tuple[str, ...]) 
     records = []
     if isinstance(downloaded.columns, pd.MultiIndex):
         level_zero = set(map(str, downloaded.columns.get_level_values(0)))
-        ticker_first = set(tickers).issubset(level_zero)
+        level_one = set(map(str, downloaded.columns.get_level_values(1)))
+        ticker_first = any(ticker in level_zero for ticker in tickers)
 
         for ticker in tickers:
-            if ticker_first:
-                one = downloaded[ticker].copy()
-            else:
-                one = downloaded.xs(ticker, axis=1, level=1).copy()
+            try:
+                if ticker_first:
+                    if ticker not in level_zero:
+                        LOGGER.warning("No market data returned for %s", ticker)
+                        continue
+                    one = downloaded[ticker].copy()
+                else:
+                    if ticker not in level_one:
+                        LOGGER.warning("No market data returned for %s", ticker)
+                        continue
+                    one = downloaded.xs(ticker, axis=1, level=1).copy()
+            except KeyError:
+                LOGGER.warning("Could not parse market data returned for %s", ticker)
+                continue
             one = one.reset_index()
             one["ticker"] = ticker
             records.append(_normalize_columns(one))
@@ -128,7 +143,7 @@ def _download_to_long_frame(downloaded: pd.DataFrame, tickers: tuple[str, ...]) 
         one["ticker"] = tickers[0]
         records.append(_normalize_columns(one))
 
-    return pd.concat(records, ignore_index=True, sort=False)
+    return pd.concat(records, ignore_index=True, sort=False) if records else pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
 
 
 def download_price_data(
@@ -148,16 +163,27 @@ def download_price_data(
 
     ticker_tuple = tuple(tickers)
     LOGGER.info("Downloading price data for %s from %s to %s", ticker_tuple, start, end)
-    downloaded = yf.download(
-        list(ticker_tuple),
-        start=start,
-        end=end,
-        auto_adjust=False,
-        actions=True,
-        group_by="ticker",
-        progress=False,
-        threads=True,
-    )
+    download_kwargs = {
+        "tickers": list(ticker_tuple),
+        "start": start,
+        "end": end,
+        "auto_adjust": False,
+        "actions": True,
+        "group_by": "ticker",
+        "progress": False,
+        "threads": True,
+    }
+    try:
+        if "timeout" in inspect.signature(yf.download).parameters:
+            download_kwargs["timeout"] = YFINANCE_DOWNLOAD_TIMEOUT
+    except (TypeError, ValueError):
+        LOGGER.warning("Could not inspect yfinance.download timeout support")
+
+    try:
+        downloaded = yf.download(**download_kwargs)
+    except Exception as exc:  # pragma: no cover - network/provider edge
+        LOGGER.warning("Could not download market data for %s: %s", ticker_tuple, exc)
+        return pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
     long_frame = _download_to_long_frame(downloaded, ticker_tuple)
 
     if raw_dir is not None:
@@ -284,10 +310,21 @@ def load_fundamental_features(tickers: tuple[str, ...] | list[str]) -> pd.DataFr
     for ticker in tickers:
         info: dict[str, object] = {}
         if yf is not None:
-            try:
-                info = yf.Ticker(ticker).info or {}
-            except Exception as exc:  # pragma: no cover - network/provider edge
-                LOGGER.warning("Could not load fundamentals for %s: %s", ticker, exc)
+            result: list[dict[str, object]] = []
+
+            def fetch_info() -> None:
+                try:
+                    result.append(yf.Ticker(ticker).info or {})
+                except Exception as exc:  # pragma: no cover - network/provider edge
+                    LOGGER.warning("Could not load fundamentals for %s: %s", ticker, exc)
+
+            worker = threading.Thread(target=fetch_info, daemon=True)
+            worker.start()
+            worker.join(YFINANCE_INFO_TIMEOUT)
+            if worker.is_alive():
+                LOGGER.warning("Timed out loading fundamentals for %s", ticker)
+            elif result:
+                info = result[0]
 
         rows.append(
             {

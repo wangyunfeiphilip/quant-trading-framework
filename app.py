@@ -76,6 +76,7 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 INVESTMENT_RESULTS_DIR = RESULTS_DIR / "investment_platform"
 DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
+DEMO_INVESTMENT_RESULTS_DIR = DEMO_DATA_DIR / "results" / "investment_platform"
 AUTO_REFRESH_DATA = os.getenv("QTF_AUTO_REFRESH_DATA", "1").strip().lower() not in {"0", "false", "no"}
 
 
@@ -1323,7 +1324,10 @@ def read_csv(signature: tuple[str, float, int]) -> pd.DataFrame:
     if size == 0:
         return pd.DataFrame()
     file_path = Path(path)
-    return pd.read_csv(file_path)
+    try:
+        return pd.read_csv(file_path)
+    except (OSError, UnicodeError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame()
 
 
 @st.cache_data(show_spinner=False)
@@ -1346,9 +1350,12 @@ def load_config_tickers() -> list[str]:
 @st.cache_data(show_spinner=False)
 def load_features() -> pd.DataFrame:
     frame = read_csv(file_signature(PROCESSED_DIR / "feature_dataset.csv"))
-    if frame.empty:
+    if frame.empty or not {"date", "ticker"}.issubset(frame.columns):
         return frame
-    frame["date"] = pd.to_datetime(frame["date"])
+    try:
+        frame["date"] = pd.to_datetime(frame["date"])
+    except (TypeError, ValueError):
+        return pd.DataFrame()
     return frame.sort_values(["date", "ticker"]).reset_index(drop=True)
 
 
@@ -1411,8 +1418,10 @@ def maybe_auto_refresh_project_data(tickers: list[str], start: str, features: pd
     with st.spinner("Refreshing project market data from yfinance..."):
         try:
             refreshed = refresh_project_market_data(tickers, start)
-        except Exception as exc:
-            st.session_state["project_data_refresh_error"] = str(exc)
+        except Exception:
+            st.session_state["project_data_refresh_error"] = (
+                "Yahoo Finance is temporarily unavailable; the existing project dataset was kept."
+            )
             return features
 
     st.session_state["project_data_refresh_error"] = ""
@@ -1436,6 +1445,8 @@ def render_project_data_status(features: pd.DataFrame, tickers: list[str], start
         st.warning(f"{status_text} Local data may be stale.")
     else:
         st.caption(f"{status_text} Data is current enough for daily research.")
+    if not AUTO_REFRESH_DATA:
+        st.caption("Automatic market-data refresh is disabled for this public deployment.")
 
     if st.session_state.get("project_data_refresh_error"):
         st.caption(f"Last automatic refresh failed: {st.session_state['project_data_refresh_error']}")
@@ -1444,8 +1455,8 @@ def render_project_data_status(features: pd.DataFrame, tickers: list[str], start
         with st.spinner("Rebuilding project universe data, fundamentals, and technical features..."):
             try:
                 refreshed = refresh_project_market_data(tickers, start)
-            except Exception as exc:
-                st.error(f"Project dataset refresh failed: {exc}")
+            except Exception:
+                st.error("Yahoo Finance is temporarily unavailable. The existing project dataset was kept.")
                 return features
         st.success(f"Project dataset refreshed through {latest_market_date(refreshed).date()}.")
         return load_features()
@@ -1479,9 +1490,12 @@ def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataF
 @st.cache_data(show_spinner=False)
 def load_portfolio_value() -> pd.DataFrame:
     frame = read_csv(file_signature(RESULTS_DIR / "portfolio_value.csv"))
-    if frame.empty:
+    if frame.empty or "date" not in frame.columns:
         return frame
-    frame["date"] = pd.to_datetime(frame["date"])
+    try:
+        frame["date"] = pd.to_datetime(frame["date"])
+    except (TypeError, ValueError):
+        return pd.DataFrame()
     return frame.sort_values("date").reset_index(drop=True)
 
 
@@ -1496,7 +1510,11 @@ def load_investment_snapshot(signature: tuple[str, float, int]) -> dict:
     path, _, size = signature
     if size == 0:
         return {}
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 @st.cache_data(show_spinner=False)
@@ -1504,7 +1522,10 @@ def load_latest_investment_report(signature: tuple[str, float, int]) -> str:
     path, _, size = signature
     if size == 0:
         return ""
-    return Path(path).read_text(encoding="utf-8")
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def latest_investment_snapshot_path() -> Path:
@@ -1512,16 +1533,79 @@ def latest_investment_snapshot_path() -> Path:
     if preferred.exists():
         return preferred
     candidates = sorted(INVESTMENT_RESULTS_DIR.glob("run_snapshot_*.json"))
-    return candidates[-1] if candidates else preferred
+    if candidates:
+        return candidates[-1]
+
+    public_demo = DEMO_INVESTMENT_RESULTS_DIR / "latest_snapshot.json"
+    return public_demo if public_demo.exists() else preferred
+
+
+def repo_path_if_exists(value: str | Path) -> Path | None:
+    """Resolve report paths without allowing local snapshots to escape the repo."""
+
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = PROJECT_ROOT / candidate
+    try:
+        resolved = candidate.resolve()
+        resolved.relative_to(PROJECT_ROOT.resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved if resolved.exists() else None
 
 
 def latest_investment_report_path(snapshot: dict) -> Path:
     if snapshot.get("report_path"):
-        path = PROJECT_ROOT / str(snapshot["report_path"])
-        if path.exists():
+        path = repo_path_if_exists(str(snapshot["report_path"]))
+        if path is not None:
             return path
     candidates = sorted(INVESTMENT_RESULTS_DIR.glob("daily_report_*.md"))
-    return candidates[-1] if candidates else INVESTMENT_RESULTS_DIR / "daily_report.md"
+    if candidates:
+        return candidates[-1]
+    public_demo = DEMO_INVESTMENT_RESULTS_DIR / "public_demo_report.md"
+    return public_demo if public_demo.exists() else INVESTMENT_RESULTS_DIR / "daily_report.md"
+
+
+def available_columns(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Select only columns present in public or locally generated snapshots."""
+
+    present = [column for column in columns if column in frame.columns]
+    return frame[present] if present else pd.DataFrame()
+
+
+def snapshot_frame(value: object) -> pd.DataFrame:
+    """Turn optional snapshot rows into a safe table without assuming a schema."""
+
+    if not isinstance(value, list):
+        return pd.DataFrame()
+    try:
+        return pd.DataFrame(value)
+    except (TypeError, ValueError):
+        return pd.DataFrame()
+
+
+def snapshot_mapping(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def snapshot_list(value: object) -> list:
+    return value if isinstance(value, list) else []
+
+
+def snapshot_number(value: object, default: float | None = None) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if np.isfinite(number) else default
+
+
+def render_snapshot_table(frame: pd.DataFrame, columns: list[str]) -> None:
+    shown = available_columns(frame, columns)
+    if shown.empty:
+        render_missing_results()
+    else:
+        st.dataframe(shown, width="stretch", hide_index=True)
 
 
 def metric_value(series: pd.Series, key: str, precision: int = 3) -> str:
@@ -1846,29 +1930,33 @@ def render_ai_investment_platform() -> None:
     snapshot_path = latest_investment_snapshot_path()
     snapshot = load_investment_snapshot(file_signature(snapshot_path))
     if not snapshot:
-        st.info("No AI investment research snapshot was found. Run `python3 scripts/run_investment_platform.py --config investment_platform.json` first.")
+        st.info("No AI investment research snapshot is available. Local-only research files are not required for the public demo.")
         return
 
-    regime = snapshot.get("market_regime", {})
-    weights = snapshot.get("factor_weights", {})
-    scores = pd.DataFrame(snapshot.get("scores", []))
-    theses = pd.DataFrame(snapshot.get("theses", []))
-    valuations = pd.DataFrame(snapshot.get("valuations", []))
-    sizing = pd.DataFrame(snapshot.get("sizing", []))
-    prediction_summary = snapshot.get("prediction_summary", {})
-    sentiment = pd.DataFrame(snapshot.get("sentiment", []))
-    behaviors = snapshot.get("behaviors", [])
-    integrations = pd.DataFrame(snapshot.get("integrations", []))
+    if snapshot.get("public_demo"):
+        st.info("PUBLIC DEMO snapshot: no personal holdings, brokerage records, or private account data are included.")
+
+    regime = snapshot_mapping(snapshot.get("market_regime"))
+    weights = snapshot_mapping(snapshot.get("factor_weights"))
+    scores = snapshot_frame(snapshot.get("scores"))
+    theses = snapshot_frame(snapshot.get("theses"))
+    valuations = snapshot_frame(snapshot.get("valuations"))
+    sizing = snapshot_frame(snapshot.get("sizing"))
+    prediction_summary = snapshot_mapping(snapshot.get("prediction_summary"))
+    sentiment = snapshot_frame(snapshot.get("sentiment"))
+    behaviors = snapshot_list(snapshot.get("behaviors"))
+    integrations = snapshot_frame(snapshot.get("integrations"))
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Market Regime", regime.get("name", "NA"))
-    col2.metric("Regime Confidence", percent_value(float(regime.get("confidence", 0.0))))
-    col3.metric("Prediction Accuracy", percent_value(float(prediction_summary.get("accuracy", 0.0))))
-    col4.metric("Evaluated Forecasts", str(int(prediction_summary.get("evaluated", 0))))
+    col2.metric("Regime Confidence", percent_value(snapshot_number(regime.get("confidence"))))
+    col3.metric("Prediction Accuracy", percent_value(snapshot_number(prediction_summary.get("accuracy"))))
+    evaluated = snapshot_number(prediction_summary.get("evaluated"))
+    col4.metric("Evaluated Forecasts", str(int(evaluated)) if evaluated is not None else "NA")
 
     st.subheader("Dynamic Factor Weights")
     weight_cols = ["growth", "quality", "momentum", "value", "risk"]
-    weight_values = [float(weights.get(column, 0.0)) for column in weight_cols]
+    weight_values = [snapshot_number(weights.get(column), default=0.0) or 0.0 for column in weight_cols]
     fig = go.Figure(data=[go.Bar(x=[item.title() for item in weight_cols], y=weight_values)])
     fig.update_layout(height=320, margin=dict(l=20, r=20, t=25, b=20), yaxis_tickformat=".0%")
     st.plotly_chart(fig, width="stretch")
@@ -1877,11 +1965,7 @@ def render_ai_investment_platform() -> None:
     left, right = st.columns([3, 2])
     with left:
         st.subheader("Composite Stock Ranking")
-        if scores.empty:
-            render_missing_results()
-        else:
-            shown = scores[["ticker", "total_score", "factor_scores", "explanation"]].copy()
-            st.dataframe(shown, width="stretch", hide_index=True)
+        render_snapshot_table(scores, ["ticker", "total_score", "factor_scores", "explanation"])
     with right:
         st.subheader("Market Drivers")
         for driver in regime.get("drivers", []):
@@ -1893,32 +1977,20 @@ def render_ai_investment_platform() -> None:
                 st.write(f"- {caution}")
 
     st.subheader("Investment Thesis Tracking")
-    if theses.empty:
-        render_missing_results()
-    else:
-        st.dataframe(theses[["ticker", "thesis", "status", "triggered_conditions"]], width="stretch", hide_index=True)
+    render_snapshot_table(theses, ["ticker", "thesis", "status", "triggered_conditions"])
 
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Scenario Valuation")
-        if valuations.empty:
-            render_missing_results()
-        else:
-            st.dataframe(valuations[["ticker", "weighted_fair_value", "upside_to_price"]], width="stretch", hide_index=True)
+        render_snapshot_table(valuations, ["ticker", "weighted_fair_value", "upside_to_price"])
     with col_right:
         st.subheader("Position Suggestions")
-        if sizing.empty:
-            render_missing_results()
-        else:
-            st.dataframe(sizing[["ticker", "current_allocation", "max_allocation", "suggested_action", "reasons"]], width="stretch", hide_index=True)
+        render_snapshot_table(sizing, ["ticker", "current_allocation", "max_allocation", "suggested_action", "reasons"])
 
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Market Sentiment")
-        if sentiment.empty:
-            render_missing_results()
-        else:
-            st.dataframe(sentiment[["ticker", "label", "speculation_risk", "reasons"]], width="stretch", hide_index=True)
+        render_snapshot_table(sentiment, ["ticker", "label", "speculation_risk", "reasons"])
     with col_right:
         st.subheader("Personal Trading Behavior Notes")
         if behaviors:
@@ -1932,10 +2004,7 @@ def render_ai_investment_platform() -> None:
             st.write("No clear behavioral bias alerts were triggered.")
 
     st.subheader("Open-Source Engine Status")
-    if integrations.empty:
-        render_missing_results()
-    else:
-        st.dataframe(integrations[["name", "role", "available"]], width="stretch", hide_index=True)
+    render_snapshot_table(integrations, ["name", "role", "available"])
 
     report_path = latest_investment_report_path(snapshot)
     report = load_latest_investment_report(file_signature(report_path))
@@ -1980,8 +2049,8 @@ def render_stock_explorer(tickers: list[str]) -> None:
         try:
             with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
                 stock = load_external_ticker_features(ticker, start=start, end=end)
-        except Exception as exc:
-            st.error(f"Unable to download {ticker}: {exc}")
+        except Exception:
+            st.error(f"Yahoo Finance did not return usable data for {ticker}. Check the symbol or try again later.")
             st.caption(
                 "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
                 "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
