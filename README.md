@@ -494,6 +494,8 @@ results/benchmark_comparison.png
 results/performance_summary.csv
 results/performance_summary_zero_cost.csv
 results/strategy_cost_comparison.csv
+results/backtest_manifest.json
+results/research_validation.json
 results/parameter_sensitivity.csv
 results/ml_model_comparison.csv
 results/key_findings.md
@@ -525,6 +527,71 @@ The Streamlit dashboard provides a public-facing research interface for the same
 
 The dashboard reads generated files from `data/processed/` and `results/`. It can still run the derivatives calculator, search interface, and external ticker lookup before the full research pipeline has been executed. External ticker lookup is intended for single-name exploration; portfolio backtests continue to use the processed project universe so the strategy research remains reproducible. If local project data is stale, the dashboard attempts one safe refresh per browser session and keeps the previous dataset if the data provider fails.
 
+### Reproducible backtests and public demo data
+
+Every full pipeline run now writes `results/backtest_manifest.json`. It records the
+data source, adjusted-price convention, data cutoff date, universe size, costs,
+slippage, signal lag, configuration fingerprint, and SHA-256 fingerprints for the
+main input/output files. The dashboard exposes the same information in the
+“Reproducibility and Data Audit” panel.
+
+The pipeline also writes `results/research_validation.json`. It is a fail-closed
+publication gate: required artifacts, ordered portfolio dates, positive portfolio
+values, trade-ledger fields, data-quality counters, signal lag, and the data cutoff
+are checked before a scheduled public refresh can be deployed. A failed validation
+keeps the previous public snapshot online.
+
+The cleaning pipeline only forward-fills an existing price history and drops a
+leading missing quote. It never backfills a historical quote from the future.
+The same rule applies to the corporate-action adjustment factor; a later split or
+dividend factor is never backfilled into earlier rows.
+Strategy signals use at least one trading-day of lag before execution.
+
+The public demo uses an immutable snapshot under `demo_data/`, currently through
+2026-08-26. This is intentional: a fixed snapshot makes the numbers an auditable
+demo instead of silently changing whenever a data vendor revises a historical row.
+Run `python main.py` locally when you need a fresh research run, then present the
+manifest and generated results together.
+
+Current yfinance fundamentals are explicitly marked as non-point-in-time, and the
+large-cap universe is explicitly marked as ex-post selected. A research-grade
+historical factor backtest should replace these with point-in-time fundamentals and
+point-in-time index membership before making a causal performance claim.
+
+### Streamlit Community Cloud sleep behavior
+
+The free Streamlit Community Cloud service hibernates apps after 12 hours without
+traffic. This is hosting behavior and cannot be eliminated by changing Python code;
+visiting the public URL wakes the app. The fixed `demo_data/` snapshot means the app
+can still start without a local filesystem or a new data download after waking.
+For an interview or a continuously available demo, use an always-on paid host or
+keep the Streamlit app as the presentation layer and host the research artifacts on
+an always-on service. See the [official hibernation documentation](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app#app-hibernation).
+
+### Zero-cost stable public page
+
+The repository also contains a static public demo workflow:
+
+```text
+.github/workflows/public-demo.yml
+scripts/build_public_demo.py
+public_demo/
+```
+
+On a normal code push, GitHub Pages builds from the immutable `demo_data/`
+snapshot. On weekday scheduled runs, GitHub Actions runs `main.py`, validates the
+fresh outputs, and publishes a new static snapshot. If a scheduled market-data
+download fails, the deployment step is not reached and the previous Pages version
+remains available. The default Pages URL is:
+
+```text
+https://<github-username>.github.io/quant-trading-framework/
+```
+
+This is the recommended free interview link. The Streamlit URL remains the
+interactive lab, while GitHub Pages provides a stable results page that does not
+need a continuously running Python server.
+
 Local access through `http://127.0.0.1:8501` only works on the machine running Streamlit. To let other users open the dashboard directly, deploy the repository to Streamlit Community Cloud or another Python app host and set `app.py` as the entry point. On Streamlit Cloud, the public URL can be renamed through the app slug, for example:
 
 ```text
@@ -537,6 +604,12 @@ Deployment documentation:
 
 ```text
 docs/deployment.md
+```
+
+Research integrity and interview presentation checklist:
+
+```text
+docs/research_integrity.md
 ```
 
 ## Configuration

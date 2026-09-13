@@ -69,6 +69,16 @@ To regenerate the full local research outputs:
 python main.py
 ```
 
+Before presenting or publishing a fresh result, run the fail-closed artifact check:
+
+```bash
+python scripts/validate_research_run.py --root .
+```
+
+It writes `results/research_validation.json` and exits non-zero when required
+files are missing, dates are not ordered, data-quality counters are non-zero, or
+the manifest does not explicitly verify the signal lag and no-future-backfill rule.
+
 ## Streamlit Community Cloud Deployment
 
 1. Push the latest branch to GitHub.
@@ -121,3 +131,18 @@ They can:
 External ticker lookup depends on Yahoo Finance availability and may be
 rate-limited. The public demo remains usable through the bundled `demo_data/`
 snapshot even if a live market-data request fails.
+
+## Stable zero-cost public access
+
+For a free interview link, enable GitHub Pages with **GitHub Actions** as the
+publishing source. The workflow in `.github/workflows/public-demo.yml` builds a
+static snapshot from `demo_data/` on code pushes and refreshes research outputs
+on weekday schedules. It validates the artifacts before deployment, so a failed
+data download or failed integrity check leaves the previous published snapshot
+available.
+
+Use the GitHub Pages URL as the primary portfolio link. Keep Streamlit as the
+interactive lab. Free Streamlit Community Cloud is not an always-on server: an
+app without traffic can hibernate, and a visitor can wake it from the sleeping
+page. A paid always-on host is required if the Python process itself must remain
+running continuously.

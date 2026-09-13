@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import time
 import logging
 
 import numpy as np
@@ -196,16 +197,20 @@ def clean_price_data(
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
 
     price_cols = ["open", "high", "low", "close", "adj_close"]
-    frame[price_cols] = frame.groupby("ticker", group_keys=False)[price_cols].apply(
-        lambda group: group.ffill().bfill()
-    )
+    # Forward-fill only. Backfilling a missing historical quote would copy a
+    # future observation into the past and contaminate a backtest.
+    for column in price_cols:
+        frame[column] = frame.groupby("ticker")[column].ffill()
     frame["volume"] = frame["volume"].fillna(0).clip(lower=0)
     frame["dividends"] = frame["dividends"].fillna(0)
     frame["stock_splits"] = frame["stock_splits"].fillna(0)
     frame["adj_close"] = frame["adj_close"].fillna(frame["close"])
+    frame = frame.dropna(subset=["open", "high", "low", "close", "adj_close"]).copy()
 
     adjustment_factor = frame["adj_close"].div(frame["close"]).replace([np.inf, -np.inf], np.nan)
-    adjustment_factor = adjustment_factor.groupby(frame["ticker"]).ffill().bfill().fillna(1.0)
+    # Forward-fill only. Backfilling a later corporate-action factor would
+    # leak future split/dividend information into earlier observations.
+    adjustment_factor = adjustment_factor.groupby(frame["ticker"]).ffill().fillna(1.0)
     frame["adjustment_factor"] = adjustment_factor
 
     for column in ("open", "high", "low", "close"):
@@ -358,10 +363,25 @@ def create_feature_dataset(
 
 
 def expected_latest_market_date(today: str | pd.Timestamp | None = None) -> pd.Timestamp:
-    """Return the latest fully closed US equity business date expected in local data."""
+    """Return the latest US equity daily bar that should be available locally.
 
-    current = pd.Timestamp.today().normalize() if today is None else pd.Timestamp(today).normalize()
-    return (current - pd.tseries.offsets.BDay(1)).normalize()
+    Before the regular US close plus a short data-provider buffer, yesterday's
+    business day is the latest complete daily candle. After that buffer, the
+    current business day should be present.
+    """
+
+    current = pd.Timestamp.now(tz="America/Los_Angeles") if today is None else pd.Timestamp(today)
+    if current.tzinfo is not None:
+        current = current.tz_convert("America/Los_Angeles").tz_localize(None)
+
+    current_date = current.normalize()
+    if current.weekday() >= 5:
+        return (current_date - pd.tseries.offsets.BDay(1)).normalize()
+
+    data_ready_after = time(14, 0)
+    if current.time() >= data_ready_after:
+        return current_date
+    return (current_date - pd.tseries.offsets.BDay(1)).normalize()
 
 
 def next_yfinance_end_date(today: str | pd.Timestamp | None = None) -> str:

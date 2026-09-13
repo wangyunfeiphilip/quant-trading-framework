@@ -6,10 +6,15 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+.venv-*/
 venv/
+*.egg-info/
 .env
 *.env
 .streamlit/secrets.toml
+.streamlit/credentials.toml
+.dashboard.pid
+logs/
 .streamlit-home/
 
 build/
@@ -23,6 +28,12 @@ cmake-build-*/
 
 data/raw/*.csv
 data/processed/*.csv
+data/private/
+data/ibkr_account_latest.json
+data/ibkr_*latest*.json
+data/*activity_statement*.csv
+data/*executions*.csv
+data/*trades*.csv
 reports/figures/*.png
 reports/figures/*.html
 reports/results/*.csv
@@ -30,6 +41,12 @@ results/*.png
 results/*.html
 results/*.csv
 results/key_findings.md
+results/investment_platform/
+investment_platform.json
+investment_platform.yaml
+site/
+public_demo/dist/
+results/research_validation.json
 docs/screenshots/*.png
 docs/screenshots/*.jpg
 .ipynb_checkpoints/

@@ -25,6 +25,18 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "notebook>=7.0"]
+institutional = [
+  "pyqlib>=0.9",
+  "openbb>=4.0",
+  "riskfolio-lib>=6.0",
+  "alphalens-reloaded>=0.4",
+  "edgartools>=3.0",
+  "quantstats>=0.0.60",
+  "vectorbt>=0.26",
+]
+brokers = ["moomoo-api>=10.10", "ib-insync>=0.9", "ibapi>=9.81"]
+research-io = ["openpyxl>=3.1", "pandas-market-calendars>=5.0", "kaleido>=1.0", "backtrader>=1.9"]
+ai-agents = ["tradingagents>=0.7"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
