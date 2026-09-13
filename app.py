@@ -1213,6 +1213,49 @@ st.markdown(
         border: 1px solid var(--qtf-line) !important;
         color: var(--qtf-ink) !important;
     }
+    /* BaseWeb renders select menus in a portal outside .stApp. Keep the
+       portal and its options in the same light surface as the terminal. */
+    [data-baseweb="popover"],
+    [data-baseweb="popover"] > div,
+    [role="listbox"] {
+        background: var(--qtf-paper) !important;
+        border-color: var(--qtf-line) !important;
+        color: var(--qtf-ink) !important;
+    }
+    [role="option"],
+    [role="option"] > div,
+    [role="option"] span {
+        background: var(--qtf-paper) !important;
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    [role="option"]:hover,
+    [role="option"]:hover > div,
+    [role="option"][aria-selected="true"],
+    [role="option"][aria-selected="true"] > div {
+        background: #efe5c6 !important;
+        color: #6f5714 !important;
+        -webkit-text-fill-color: #6f5714 !important;
+    }
+    .stApp .signal-panel {
+        background: var(--qtf-paper) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-left-width: 4px !important;
+        color: var(--qtf-ink) !important;
+        box-shadow: 0 8px 24px rgba(21,21,21,0.06) !important;
+    }
+    .stApp .signal-panel .signal-headline,
+    .stApp .signal-panel ul,
+    .stApp .signal-panel li,
+    .stApp .signal-panel .signal-note {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp .signal-panel .signal-note { color: var(--qtf-muted) !important; }
+    .stApp .signal-panel .signal-badge {
+        color: #6f5714 !important;
+        background: #efe5c6 !important;
+        border-color: rgba(139,112,29,0.42) !important;
+    }
     .stApp [data-testid="stAlert"],
     .stApp .stAlert,
     .stApp [data-testid="stAlert"] * {
