@@ -7,10 +7,12 @@ import json
 import os
 import shutil
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, time as datetime_time, timezone
 from html import escape
 from pathlib import Path
 import sys
+import threading
+import time
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -32,6 +34,9 @@ from data.data_loader import (
     clean_price_data,
     create_feature_dataset,
     download_price_data,
+    fetch_live_ticker_quote,
+    fetch_ticker_history,
+    is_yahoo_rate_limit_error,
     load_fundamental_features,
 )
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
@@ -80,6 +85,14 @@ INVESTMENT_RESULTS_DIR = RESULTS_DIR / "investment_platform"
 DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
 DEMO_INVESTMENT_RESULTS_DIR = DEMO_DATA_DIR / "results" / "investment_platform"
 AUTO_REFRESH_DATA = os.getenv("QTF_AUTO_REFRESH_DATA", "1").strip().lower() not in {"0", "false", "no"}
+LIVE_HISTORY_TTL = 1800
+LIVE_FUNDAMENTALS_TTL = 14400
+LIVE_QUOTE_TTL = 30
+LIVE_RATE_LIMIT_COOLDOWN = 300
+_live_quote_memory: dict[str, dict[str, object]] = {}
+_live_history_memory: dict[str, pd.DataFrame] = {}
+_live_quote_lock = threading.Lock()
+_live_rate_limit_until = 0.0
 
 
 st.set_page_config(
@@ -1476,20 +1489,20 @@ def normalize_ticker(value: str) -> str:
     return ticker
 
 
-@st.cache_data(show_spinner=False, ttl=15)
+@st.cache_data(show_spinner=False, ttl=LIVE_HISTORY_TTL)
 def load_external_ticker_prices(ticker: str, start: str, end: str) -> pd.DataFrame:
-    raw = download_price_data([ticker], start=start, end=end, raw_dir=None)
+    raw = fetch_ticker_history(ticker, start=start, end=end)
     if raw.empty:
         raise ValueError("data provider returned no price rows")
     return raw
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=LIVE_FUNDAMENTALS_TTL)
 def load_external_ticker_fundamentals(ticker: str) -> pd.DataFrame:
     return load_fundamental_features([ticker])
 
 
-@st.cache_data(show_spinner=False, ttl=15)
+@st.cache_data(show_spinner=False, ttl=LIVE_HISTORY_TTL)
 def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
     raw = load_external_ticker_prices(ticker, start=start, end=end)
 
@@ -1498,6 +1511,11 @@ def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataF
     features = create_feature_dataset(clean, fundamentals=fundamentals)
     features["date"] = pd.to_datetime(features["date"])
     return features.sort_values(["date", "ticker"]).reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False, ttl=LIVE_QUOTE_TTL)
+def load_live_ticker_quote(ticker: str) -> dict[str, object]:
+    return fetch_live_ticker_quote(ticker)
 
 
 @st.cache_data(show_spinner=False)
@@ -2033,7 +2051,109 @@ def market_timestamp() -> datetime:
         return datetime.now(timezone.utc)
 
 
-def render_ticker_analysis(stock: pd.DataFrame, ticker: str, source_label: str) -> None:
+def us_market_is_open(now: datetime | None = None) -> bool:
+    current = now or market_timestamp()
+    return current.weekday() < 5 and datetime_time(9, 30) <= current.time() < datetime_time(16, 0)
+
+
+def format_market_data_timestamp(value: object) -> str:
+    try:
+        timestamp = pd.Timestamp(value)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.tz_localize("America/New_York")
+        else:
+            timestamp = timestamp.tz_convert("America/New_York")
+        return timestamp.strftime("%Y-%m-%d %H:%M:%S %Z")
+    except (TypeError, ValueError):
+        return "not available"
+
+
+def latest_cached_live_quote(ticker: str) -> dict[str, object] | None:
+    with _live_quote_lock:
+        quote = _live_quote_memory.get(ticker)
+        return dict(quote) if quote else None
+
+
+def latest_cached_live_history(ticker: str) -> pd.DataFrame | None:
+    with _live_quote_lock:
+        history = _live_history_memory.get(ticker)
+        return history.copy() if history is not None else None
+
+
+def live_rate_limit_active() -> bool:
+    with _live_quote_lock:
+        return time.monotonic() < _live_rate_limit_until
+
+
+def get_live_quote(ticker: str) -> tuple[dict[str, object] | None, str]:
+    """Use one shared cooldown to prevent public sessions from hammering Yahoo."""
+
+    global _live_rate_limit_until
+    cached = latest_cached_live_quote(ticker)
+    now = time.monotonic()
+    with _live_quote_lock:
+        cooldown_active = now < _live_rate_limit_until
+    if cooldown_active:
+        return cached, "cached" if cached else "historical_fallback"
+
+    try:
+        quote = load_live_ticker_quote(ticker)
+    except Exception as error:
+        if is_yahoo_rate_limit_error(error):
+            with _live_quote_lock:
+                _live_rate_limit_until = now + LIVE_RATE_LIMIT_COOLDOWN
+            return cached, "cached" if cached else "historical_fallback"
+        return cached, "cached" if cached else "historical_fallback"
+
+    with _live_quote_lock:
+        _live_quote_memory[ticker] = dict(quote)
+    return quote, "live"
+
+
+def enter_live_rate_limit_cooldown() -> None:
+    global _live_rate_limit_until
+    with _live_quote_lock:
+        _live_rate_limit_until = time.monotonic() + LIVE_RATE_LIMIT_COOLDOWN
+
+
+def render_live_quote_status(
+    status: str,
+    checked_at: datetime,
+    quote: dict[str, object] | None,
+    historical_timestamp: object | None = None,
+) -> None:
+    checked_text = checked_at.strftime("%H:%M:%S %Z")
+    data_timestamp = quote.get("market_data_timestamp") if quote else historical_timestamp
+    data_text = format_market_data_timestamp(data_timestamp)
+    if status == "live":
+        st.caption(f"LIVE · Live quote retrieved: {checked_text} · Data timestamp: {data_text}")
+    elif status == "cached":
+        st.warning("CACHED · Yahoo data is temporarily rate-limited or unavailable. Showing the last cached quote.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
+    elif status == "market_closed":
+        st.info("MARKET CLOSED · The US market is closed. Showing the latest available market price.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
+    else:
+        st.warning("HISTORICAL FALLBACK · Live data is unavailable. Showing the latest historical observation.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
+
+
+def quote_price_label(quote_status: str | None) -> str:
+    return {
+        "live": "Latest Live Price",
+        "cached": "Last Cached Price",
+        "market_closed": "Latest Available Price",
+        "historical_fallback": "Latest Historical Price",
+    }.get(quote_status, "Latest Adjusted Close")
+
+
+def render_ticker_analysis(
+    stock: pd.DataFrame,
+    ticker: str,
+    source_label: str,
+    live_quote: dict[str, object] | None = None,
+    quote_status: str | None = None,
+) -> None:
     if stock.empty:
         st.warning(f"No market data was found for {ticker}. Check the ticker symbol and try again.")
         return
@@ -2044,7 +2164,9 @@ def render_ticker_analysis(stock: pd.DataFrame, ticker: str, source_label: str) 
     max_dd, _ = maximum_drawdown(returns)
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Latest Adjusted Close", f"{latest['adjusted_close']:.2f}")
+    latest_price = live_quote.get("price") if live_quote else latest["adjusted_close"]
+    price_label = quote_price_label(quote_status)
+    col1.metric(price_label, f"{float(latest_price):.2f}")
     col2.metric("21D Return", percent_value(latest.get("return_21d")))
     col3.metric("126D Return", percent_value(latest.get("return_126d")))
     col4.metric("Maximum Drawdown", percent_value(max_dd))
@@ -2101,22 +2223,84 @@ def render_ticker_analysis(stock: pd.DataFrame, ticker: str, source_label: str) 
     st.dataframe(stock[["date", "ticker", *shown]].tail(30), width="stretch", hide_index=True)
 
 
-@st.fragment(run_every="15s")
-def render_live_ticker_result(ticker: str, start: str, end: str) -> None:
+@st.fragment(run_every="30s")
+def render_live_ticker_result(
+    ticker: str,
+    start: str,
+    end: str,
+    fallback_stock: pd.DataFrame | None = None,
+) -> None:
+    checked_at = market_timestamp()
+    cached_history = latest_cached_live_history(ticker)
+    project_history = fallback_stock.copy() if fallback_stock is not None else pd.DataFrame()
+
+    # A provider cooldown is process-wide so public users do not collectively
+    # keep retrying Yahoo after it has returned a rate-limit response.
+    if live_rate_limit_active():
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        cached_quote = latest_cached_live_quote(ticker)
+        if stock.empty:
+            render_live_quote_status("historical_fallback", checked_at, None)
+            st.warning("No cached market data is available while Yahoo Finance is cooling down.")
+            return
+        quote_status = "cached" if cached_quote else "historical_fallback"
+        render_live_quote_status(quote_status, checked_at, cached_quote, stock["date"].max())
+        source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+        render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=quote_status)
+        return
+
+    market_open = us_market_is_open(checked_at)
+    # When the US market is closed, a previously available frame is enough to
+    # keep the page useful without starting another historical request.
+    if not market_open and (cached_history is not None and not cached_history.empty or not project_history.empty):
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        cached_quote = latest_cached_live_quote(ticker)
+        render_live_quote_status("market_closed", checked_at, cached_quote, stock["date"].max())
+        source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+        render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status="market_closed")
+        return
+
     try:
-        with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
+        with st.spinner(f"Loading cached history for {ticker} and computing indicators..."):
             stock = load_external_ticker_features(ticker, start=start, end=end)
-    except Exception:
-        st.caption(f"LIVE · Last updated: {market_timestamp().strftime('%H:%M:%S %Z')}")
-        st.error(f"Yahoo Finance did not return usable data for {ticker}. Check the symbol or try again later.")
+    except Exception as error:
+        if is_yahoo_rate_limit_error(error):
+            enter_live_rate_limit_cooldown()
+            cached_quote = latest_cached_live_quote(ticker)
+            stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+            if stock.empty:
+                render_live_quote_status("historical_fallback", checked_at, None)
+                st.warning("No cached market data is available while Yahoo Finance is cooling down.")
+                return
+            quote_status = "cached" if cached_quote else "historical_fallback"
+            render_live_quote_status(quote_status, checked_at, cached_quote, stock["date"].max())
+            source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+            render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=quote_status)
+            return
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        if not stock.empty:
+            cached_quote = latest_cached_live_quote(ticker)
+            status = "market_closed" if not market_open else ("cached" if cached_quote else "historical_fallback")
+            render_live_quote_status(status, checked_at, cached_quote, stock["date"].max())
+            source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+            render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=status)
+            return
+        st.error(f"Yahoo Finance did not return usable historical data for {ticker}. Check the symbol or try again later.")
         st.caption(
             "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
             "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
         )
         return
 
-    st.caption(f"LIVE · Last updated: {market_timestamp().strftime('%H:%M:%S %Z')}")
-    render_ticker_analysis(stock, ticker, "Live yfinance lookup")
+    with _live_quote_lock:
+        _live_history_memory[ticker] = stock.copy()
+
+    if market_open:
+        live_quote, quote_status = get_live_quote(ticker)
+    else:
+        live_quote, quote_status = latest_cached_live_quote(ticker), "market_closed"
+    render_live_quote_status(quote_status, checked_at, live_quote, stock["date"].max())
+    render_ticker_analysis(stock, ticker, "Cached yfinance history", live_quote=live_quote, quote_status=quote_status)
 
 
 def render_stock_explorer(tickers: list[str]) -> None:
@@ -2148,12 +2332,14 @@ def render_stock_explorer(tickers: list[str]) -> None:
     if refresh_external:
         load_external_ticker_prices.clear()
         load_external_ticker_features.clear()
+        load_live_ticker_quote.clear()
 
     ticker = external or selected
     use_external = bool(external)
 
     if use_external:
-        render_live_ticker_result(ticker, start, end)
+        project_fallback = features[features["ticker"].eq(ticker)].copy()
+        render_live_ticker_result(ticker, start, end, project_fallback)
         return
 
     stock = features[features["ticker"].eq(ticker)].copy()

@@ -182,6 +182,8 @@ def download_price_data(
     try:
         downloaded = yf.download(**download_kwargs)
     except Exception as exc:  # pragma: no cover - network/provider edge
+        if is_yahoo_rate_limit_error(exc):
+            raise
         LOGGER.warning("Could not download market data for %s: %s", ticker_tuple, exc)
         return pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
     long_frame = _download_to_long_frame(downloaded, ticker_tuple)
@@ -193,6 +195,85 @@ def download_price_data(
             group.to_csv(raw_path / f"{ticker}.csv", index=False)
 
     return long_frame
+
+
+def is_yahoo_rate_limit_error(error: BaseException) -> bool:
+    """Recognize provider throttling across yfinance versions and HTTP clients."""
+
+    if error.__class__.__name__ == "YFRateLimitError":
+        return True
+    status_code = getattr(error, "status_code", None)
+    if status_code == 429:
+        return True
+    message = str(error).lower()
+    return "too many requests" in message or "rate limited" in message or "status code 429" in message
+
+
+def fetch_live_ticker_quote(ticker: str, timeout: float = 30) -> dict[str, object]:
+    """Fetch one lightweight quote window without writing any market-data files."""
+
+    if yf is None:
+        raise ImportError("yfinance is required. Install project requirements first.")
+
+    ticker_client = yf.Ticker(ticker)
+    recent = ticker_client.history(
+        period="1d",
+        interval="1m",
+        prepost=False,
+        actions=False,
+        auto_adjust=False,
+        timeout=timeout,
+    )
+    if recent.empty:
+        recent = ticker_client.history(
+            period="5d",
+            interval="1d",
+            prepost=False,
+            actions=False,
+            auto_adjust=False,
+            timeout=timeout,
+        )
+    if recent.empty:
+        raise ValueError("data provider returned no live quote rows")
+
+    price_column = "Close" if "Close" in recent.columns else "close"
+    if price_column not in recent.columns:
+        raise ValueError("data provider returned no close price")
+    prices = pd.to_numeric(recent[price_column], errors="coerce").dropna()
+    if prices.empty:
+        raise ValueError("data provider returned no usable close price")
+
+    timestamp = pd.Timestamp(prices.index[-1])
+    return {
+        "price": float(prices.iloc[-1]),
+        "market_data_timestamp": timestamp.isoformat(),
+    }
+
+
+def fetch_ticker_history(
+    ticker: str,
+    start: str,
+    end: str,
+    timeout: float = 30,
+) -> pd.DataFrame:
+    """Fetch one ticker's historical base directly so provider errors propagate."""
+
+    if yf is None:
+        raise ImportError("yfinance is required. Install project requirements first.")
+
+    history = yf.Ticker(ticker).history(
+        start=start,
+        end=end,
+        prepost=False,
+        actions=True,
+        auto_adjust=False,
+        timeout=timeout,
+    )
+    if history.empty:
+        return pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
+    frame = history.reset_index()
+    frame["ticker"] = ticker
+    return _normalize_columns(frame)
 
 
 def clean_price_data(

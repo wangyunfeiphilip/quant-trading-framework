@@ -19,7 +19,7 @@ dependencies = [
   "streamlit==1.62.0",
   "scikit-learn==1.5.2",
   "statsmodels==0.14.4",
-  "yfinance==0.2.54",
+  "yfinance==1.7.0",
   "PyYAML==6.0.2",
 ]
 
