@@ -1025,17 +1025,17 @@ st.markdown(
         gap: 0 !important;
     }
     .feature-card {
-        background: transparent !important;
-        border: 0 !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 0 !important;
-        padding: 24px 22px 28px 0 !important;
+        background: var(--qtf-black) !important;
+        border: 1px solid #323232 !important;
+        border-top: 2px solid var(--qtf-accent) !important;
+        border-radius: 8px !important;
+        padding: 24px 22px 28px !important;
         min-height: 210px !important;
         transition: transform 180ms ease, border-color 180ms ease !important;
     }
     .feature-card:hover { transform: translateY(-3px); border-color: var(--qtf-accent) !important; }
-    .feature-card * { color: #fff !important; }
-    .feature-card p, .feature-card .feature-copy { color: rgba(255,255,255,0.62) !important; }
+    .feature-card * { color: var(--qtf-accent) !important; }
+    .feature-card p, .feature-card .feature-copy { color: rgba(216,187,102,0.76) !important; }
     .feature-card .feature-index { color: var(--qtf-accent) !important; }
 
     .workspace-frame {
@@ -1076,6 +1076,22 @@ st.markdown(
         border-radius: 4px !important;
     }
     .stAlert { border-radius: 4px !important; }
+
+    .back-home-row {
+        display: flex;
+        justify-content: flex-start;
+        margin: -12px 0 18px;
+    }
+    .back-home-row .stButton > button {
+        background: transparent !important;
+        color: var(--qtf-ink) !important;
+        border-color: var(--qtf-line) !important;
+        box-shadow: none !important;
+    }
+    .back-home-row .stButton > button:hover {
+        background: var(--qtf-black) !important;
+        color: var(--qtf-accent) !important;
+    }
 
     @media (max-width: 900px) {
         .block-container { padding: 0.75rem 1rem 3rem !important; }
@@ -2040,6 +2056,9 @@ def main() -> None:
     if module == "home":
         render_home_hero(len(tickers))
     else:
+        st.markdown('<div class="back-home-row">', unsafe_allow_html=True)
+        st.button("Back to Home", key="back_to_home", on_click=set_active_module, args=("home",))
+        st.markdown("</div>", unsafe_allow_html=True)
         render_command_search(tickers)
         render_workspace_frame(module)
     pages[module]()
