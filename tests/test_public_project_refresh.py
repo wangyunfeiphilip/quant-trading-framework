@@ -10,6 +10,7 @@ from scripts.refresh_public_project_data import (
     RefreshValidationError,
     publish_csv_if_changed,
     preserve_published_fundamentals,
+    preserve_stable_published_rows,
     public_csv_changed,
     validate_refresh_outputs,
 )
@@ -174,6 +175,61 @@ def test_changed_fundamentals_alone_do_not_change_public_snapshot(tmp_path: Path
     assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is False
     assert stabilized["close"].equals(clean["close"])
     assert len(quality) == len(EXPECTED)
+
+
+def _source_market_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
+    previous, _, _ = _frames()
+    previous = previous.assign(
+        open=101.0,
+        high=102.0,
+        low=99.0,
+        adj_close=99.5,
+        volume=1000,
+        dividends=0.0,
+        stock_splits=0.0,
+        capital_gains=0.0,
+        sma_20=100.0,
+        rsi_14=50.0,
+    )
+    return previous, previous.copy()
+
+
+def test_tiny_adjusted_price_jitter_preserves_entire_published_row(tmp_path: Path) -> None:
+    previous, candidate = _source_market_frames()
+    candidate.loc[0, "adj_close"] += 5e-6
+    candidate.loc[0, "adjusted_close"] += 5e-6
+    candidate.loc[0, "sma_20"] = 100.0005
+    candidate.loc[0, "rsi_14"] = 50.5
+
+    stabilized = preserve_stable_published_rows(candidate, previous)
+    existing_path = tmp_path / "existing.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    previous.to_csv(existing_path, index=False)
+    stabilized.to_csv(candidate_path, index=False)
+    before = existing_path.read_bytes()
+
+    pd.testing.assert_series_equal(stabilized.iloc[0], previous.iloc[0], check_names=False)
+    assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is False
+    assert publish_csv_if_changed(candidate_path, existing_path, ["date", "ticker"]) is False
+    assert existing_path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("close", 100.01),
+        ("adj_close", 99.51),
+        ("dividends", 0.25),
+        ("stock_splits", 2.0),
+    ],
+)
+def test_material_source_market_revisions_are_not_preserved(column: str, value: float) -> None:
+    previous, candidate = _source_market_frames()
+    candidate.loc[0, column] = value
+    stabilized = preserve_stable_published_rows(candidate, previous)
+
+    assert stabilized.loc[0, column] == value
+    assert not stabilized.iloc[0].equals(previous.iloc[0])
 
 
 def test_changed_csv_uses_canonical_columns_floats_and_line_endings(tmp_path: Path) -> None:

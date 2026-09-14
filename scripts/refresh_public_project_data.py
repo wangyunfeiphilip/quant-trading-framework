@@ -12,6 +12,7 @@ import shutil
 import sys
 import tempfile
 
+import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +38,22 @@ SNAPSHOT_FUNDAMENTAL_COLUMNS = (
     "roe",
     "revenue_growth",
 )
+SOURCE_PRICE_COLUMNS = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "adj_close",
+    "adjusted_close",
+)
+SOURCE_EXACT_COLUMNS = (
+    "volume",
+    "dividends",
+    "stock_splits",
+    "capital_gains",
+)
+SOURCE_PRICE_RTOL = 1e-6
+SOURCE_PRICE_ATOL = 1e-6
 SENSITIVE_TEXT = re.compile(
     r"(?i)(?:/Users/|/var/folders|TemporaryItems|account(?:\s*(?:number|no\.?|#))?|"
     r"holdings?|brokerage|balances?|transactions?|IBKR|Moomoo|api[_ -]?key|"
@@ -110,6 +127,79 @@ def preserve_published_fundamentals(
     for column in columns:
         merged.loc[existing_rows, column] = merged.loc[existing_rows, f"{column}__published"]
     return merged.loc[:, out.columns]
+
+
+def _source_values_match(candidate: object, published: object, *, tolerant: bool) -> bool:
+    """Compare one source value while treating only price fields as tolerant."""
+
+    candidate_missing = bool(pd.isna(candidate))
+    published_missing = bool(pd.isna(published))
+    if candidate_missing or published_missing:
+        return candidate_missing and published_missing
+    if tolerant:
+        try:
+            return bool(
+                np.isclose(
+                    float(candidate),
+                    float(published),
+                    rtol=SOURCE_PRICE_RTOL,
+                    atol=SOURCE_PRICE_ATOL,
+                    equal_nan=True,
+                )
+            )
+        except (TypeError, ValueError):
+            return False
+    return bool(candidate == published)
+
+
+def preserve_stable_published_rows(
+    candidate: pd.DataFrame,
+    previous: pd.DataFrame,
+) -> pd.DataFrame:
+    """Preserve complete published rows when source market data is unchanged."""
+
+    out = _normalise(candidate)
+    if out.empty or previous.empty or not {"date", "ticker"}.issubset(out.columns):
+        return out
+
+    published = _normalise(previous)
+    if not {"date", "ticker"}.issubset(published.columns):
+        return out
+
+    source_columns = [
+        column
+        for column in (*SOURCE_PRICE_COLUMNS, *SOURCE_EXACT_COLUMNS)
+        if column in out.columns and column in published.columns
+    ]
+    if not source_columns:
+        return out
+
+    published_by_key = published.set_index(["date", "ticker"], drop=False)
+    candidate_keys = pd.MultiIndex.from_frame(out[["date", "ticker"]])
+    stable = pd.Series(False, index=out.index)
+    for row_index, key in zip(out.index, candidate_keys):
+        if key not in published_by_key.index:
+            continue
+        candidate_row = out.loc[row_index]
+        published_row = published_by_key.loc[key]
+        stable.loc[row_index] = all(
+            _source_values_match(
+                candidate_row[column],
+                published_row[column],
+                tolerant=column in SOURCE_PRICE_COLUMNS,
+            )
+            for column in source_columns
+        )
+
+    common_columns = [column for column in out.columns if column in published.columns]
+    if not stable.any() or not common_columns:
+        return out
+
+    published_rows = published_by_key.loc[candidate_keys[stable.to_numpy()]]
+    published_rows.index = out.index[stable.to_numpy()]
+    for column in common_columns:
+        out.loc[stable, column] = published_rows[column].to_numpy()
+    return out
 
 
 def _canonicalise_public_frame(
@@ -345,6 +435,7 @@ def update_public_snapshot(project_root: Path, start: str | None = None) -> Refr
         candidate_readme = temporary_root / "README.md"
         candidate_feature_frame = pd.read_csv(candidate_feature)
         candidate_feature_frame = preserve_published_fundamentals(candidate_feature_frame, previous)
+        candidate_feature_frame = preserve_stable_published_rows(candidate_feature_frame, previous)
         _write_canonical_csv(
             candidate_feature_frame,
             candidate_feature,
