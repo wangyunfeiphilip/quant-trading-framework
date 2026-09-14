@@ -1,0 +1,82 @@
+name: daily public project refresh
+
+on:
+  schedule:
+    - cron: "0 23 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-public-project-refresh
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: math-finance-upgrade
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out target deployment branch
+        uses: actions/checkout@v4
+        with:
+          ref: math-finance-upgrade
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install production dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Synchronize target branch before refresh
+        run: |
+          git fetch origin "$TARGET_BRANCH"
+          git rebase "origin/$TARGET_BRANCH"
+
+      - name: Refresh and validate public Project Universe
+        env:
+          QTF_AUTO_REFRESH_DATA: "0"
+        run: python scripts/refresh_public_project_data.py
+
+      - name: Verify only approved public files changed
+        run: |
+          allowed='^(demo_data/README\.md|demo_data/data/processed/data_quality_report\.csv|demo_data/data/processed/feature_dataset\.csv)$'
+          changed="$(git status --short | awk '{print $2}')"
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Ev "$allowed" | grep -q .; then
+            :
+          elif [ -n "$changed" ]; then
+            echo "Unexpected files changed:"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+
+      - name: Commit only when public data changed
+        id: commit
+        run: |
+          git add -- demo_data/README.md demo_data/data/processed/data_quality_report.csv demo_data/data/processed/feature_dataset.csv
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No public dataset changes; no commit created."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh project universe market data"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Log refresh summary
+        run: |
+          git diff HEAD^ --stat || true
+          git log -1 --oneline
+
+      - name: Push target branch without force
+        if: steps.commit.outputs.changed == 'true'
+        run: git push origin "HEAD:$TARGET_BRANCH"
