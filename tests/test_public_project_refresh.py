@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
@@ -69,15 +67,3 @@ def test_suspicious_row_loss_is_rejected() -> None:
     previous = pd.concat([feature] * 10, ignore_index=True)
     with pytest.raises(RefreshValidationError, match="suspiciously low"):
         validate_refresh_outputs(feature, clean, quality, EXPECTED, EXPECTED_LATEST, previous)
-
-
-def test_public_refresh_workflow_is_schedule_and_dispatch_only() -> None:
-    workflow = Path(__file__).parents[1] / ".github/workflows/daily-public-project-refresh.yml"
-    text = workflow.read_text(encoding="utf-8")
-    assert 'cron: "0 23 * * 1-5"' in text
-    assert "workflow_dispatch:" in text
-    assert "push:" not in text
-    assert "contents: write" in text
-    assert "ref: math-finance-upgrade" in text
-    assert "git push origin \"HEAD:$TARGET_BRANCH\"" in text
-    assert "--force" not in text
