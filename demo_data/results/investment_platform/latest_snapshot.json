@@ -1,0 +1,32 @@
+{
+  "public_demo": true,
+  "demo_label": "PUBLIC DEMO - no personal financial data",
+  "as_of": "not available",
+  "market_regime": {
+    "name": "Public demo data",
+    "confidence": null,
+    "drivers": [],
+    "cautions": [
+      "Private IBKR, Moomoo, holdings, and account data are intentionally excluded from this deployment."
+    ]
+  },
+  "factor_weights": {
+    "growth": null,
+    "quality": null,
+    "momentum": null,
+    "value": null,
+    "risk": null,
+    "reason": "Public demo fallback contains no calculated personal research outputs."
+  },
+  "prediction_summary": {
+    "accuracy": null,
+    "evaluated": null
+  },
+  "scores": [],
+  "theses": [],
+  "valuations": [],
+  "sizing": [],
+  "sentiment": [],
+  "behaviors": [],
+  "integrations": []
+}

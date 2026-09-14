@@ -92,6 +92,41 @@ def build_search_index(tickers: tuple[str, ...] | list[str] = ()) -> list[Search
             ("future_21d_return", "timeseriessplit", "rmse", "r2"),
         ),
         SearchItem(
+            "Microsoft Qlib",
+            "Research Framework",
+            "Core AI-oriented quantitative stock-selection framework for factor research, ML modeling, and backtesting.",
+            "Open Source Stack",
+            ("qlib", "factor", "alpha", "backtest", "quant", "因子", "回测", "选股"),
+        ),
+        SearchItem(
+            "OpenBB",
+            "Research Framework",
+            "Open-source research terminal and data layer for fundamentals, macro, news, options, and market data.",
+            "Open Source Stack",
+            ("openbb", "terminal", "fundamentals", "macro", "news", "数据", "新闻", "宏观"),
+        ),
+        SearchItem(
+            "financial-research-agent",
+            "Research Framework",
+            "SEC filings RAG, FinBERT sentiment, and cross-signal divergence detector for earnings research.",
+            "Earnings Research",
+            ("sec", "edgar", "filings", "finbert", "rag", "10-k", "10-q", "财报"),
+        ),
+        SearchItem(
+            "ai-berkshire",
+            "Research Framework",
+            "Value-investing checklist for moat, management quality, cash flow, and margin of safety.",
+            "Valuation Lab",
+            ("berkshire", "buffett", "munger", "value", "valuation", "护城河", "价值"),
+        ),
+        SearchItem(
+            "FinRL",
+            "Research Framework",
+            "Reinforcement-learning research sandbox for allocation experiments, not direct trading signals.",
+            "Research Lab",
+            ("finrl", "reinforcement", "ppo", "a2c", "ddpg", "rl", "强化学习"),
+        ),
+        SearchItem(
             "Key Findings",
             "Report",
             "Generated research summary from the current data pull and model settings.",
@@ -122,7 +157,7 @@ def _tokens(value: str) -> set[str]:
 def search_catalog(query: str, catalog: list[SearchItem], limit: int = 12) -> list[SearchItem]:
     """Return ranked search matches for a free-text query."""
 
-    normalized = query.strip().lower()
+    normalized = _normalize_query(query)
     if not normalized:
         return catalog[:limit]
 
@@ -141,3 +176,13 @@ def search_catalog(query: str, catalog: list[SearchItem], limit: int = 12) -> li
 
     scored.sort(key=lambda pair: (-pair[0], pair[1].category, pair[1].title))
     return [item for _, item in scored[:limit]]
+
+
+def _normalize_query(query: str) -> str:
+    value = query.strip().lower()
+    if re.fullmatch(r"\d{6}", value):
+        if value.startswith(("0", "3")):
+            return f"sz.{value}"
+        if value.startswith(("6", "8", "9")):
+            return f"sh.{value}"
+    return value

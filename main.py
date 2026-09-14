@@ -25,6 +25,8 @@ from derivatives.numerical_methods import binomial_option_price, monte_carlo_con
 from models.factor_model import build_proxy_factors, fama_french_regression, load_kenneth_french_factors
 from models.prediction_model import train_return_models
 from portfolio.optimization import annualized_covariance, annualized_mean_returns, efficient_frontier
+from research.reproducibility import build_backtest_manifest, write_backtest_manifest
+from research.validation import validate_research_outputs, write_validation_report
 from risk.risk_metrics import maximum_drawdown, performance_summary
 from strategies.factor_strategy import generate_factor_weights
 from strategies.mean_reversion import generate_mean_reversion_weights
@@ -527,6 +529,34 @@ def main() -> None:
     _save_benchmark_chart(strategy_returns, benchmark_returns, results_dir / "benchmark_comparison.png")
     _save_factor_exposure_chart(exposure, results_dir / "factor_exposure.png")
     _save_efficient_frontier(features, config, results_dir)
+
+    artifact_paths = [
+        market_config.processed_dir / "feature_dataset.csv",
+        market_config.processed_dir / "clean_stock_data.csv",
+        market_config.processed_dir / "data_quality_report.csv",
+        results_dir / "performance_summary.csv",
+        results_dir / "trade_history.csv",
+        results_dir / "portfolio_value.csv",
+        results_dir / "factor_exposure.csv",
+    ]
+    manifest = build_backtest_manifest(
+        config=config,
+        features=features,
+        artifact_paths=artifact_paths,
+        project_root=PROJECT_ROOT,
+        backtest_summary={
+            "portfolio_rows": int(len(result.portfolio_value)),
+            "trade_count": int(len(result.trades)),
+            "final_portfolio_value": float(result.portfolio_value["total_value"].iloc[-1]),
+            "net_cumulative_return": float(summary.get("cumulative_return", np.nan)),
+            "net_sharpe_ratio": float(summary.get("sharpe_ratio", np.nan)),
+        },
+    )
+    write_backtest_manifest(manifest, results_dir / "backtest_manifest.json")
+    validation = validate_research_outputs(PROJECT_ROOT)
+    write_validation_report(validation, results_dir / "research_validation.json")
+    if validation["status"] != "passed":
+        raise RuntimeError("Research artifact validation failed: " + "; ".join(validation["errors"]))
 
     print("Research pipeline completed. Outputs written to results/.")
 

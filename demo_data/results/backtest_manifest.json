@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-08-26T00:00:00+00:00",
+  "git_commit": null,
+  "data": {
+    "source": "Yahoo Finance via yfinance; immutable public demo snapshot",
+    "price_field": "adjusted_close",
+    "corporate_actions": "auto_adjust=False with adjusted_close used for return calculations",
+    "start_date": "2023-01-03",
+    "end_date": "2026-08-26",
+    "rows": 46665,
+    "ticker_count": 51,
+    "configuration_sha256": "demo-snapshot-not-generated-in-this-public-checkout"
+  },
+  "backtest": {
+    "strategy": "momentum",
+    "top_n": 10,
+    "momentum_horizons": [21, 63, 126],
+    "initial_capital": 100000,
+    "transaction_cost_bps": 5,
+    "slippage_bps": 2,
+    "signal_lag_sessions": 1,
+    "rebalance_frequency": "M"
+  },
+  "validation": {
+    "chronological_signal_lag": true,
+    "future_price_backfill": false,
+    "fundamentals_point_in_time": false,
+    "universe_point_in_time": false,
+    "warnings": [
+      "yfinance fundamentals are current snapshots, not point-in-time historical fundamentals.",
+      "The visible large-cap universe is selected ex post and can contain survivorship bias.",
+      "This public demo uses a fixed snapshot through 2026-08-26; refresh locally before presenting current results."
+    ]
+  },
+  "artifacts": {
+    "demo_data/data/processed/feature_dataset.csv": {
+      "sha256": "1a87a3557ed738ab89bd836e5858d40bc4754c7a967d0c68e527dd3d25a8bbfa",
+      "bytes": 28411332
+    },
+    "demo_data/results/portfolio_value.csv": {
+      "sha256": "7f5a56444c9c5c9d200c4e817560447bb1b8b1efe1268736d7ce5a00d7182df2",
+      "bytes": 309637
+    },
+    "demo_data/results/trade_history.csv": {
+      "sha256": "388bf8e11f77769d52ec6ac3bc8a79c224873aea90d39339ca6be918f8dac9c0",
+      "bytes": 254864
+    }
+  }
+}

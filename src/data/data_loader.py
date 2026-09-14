@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import time
+import inspect
 import logging
+import threading
 
 import numpy as np
 import pandas as pd
@@ -72,6 +75,8 @@ DEFAULT_TICKERS = (
     "SPY",
 )
 PRICE_COLUMNS = ("open", "high", "low", "close", "adj_close", "volume")
+YFINANCE_DOWNLOAD_TIMEOUT = 30
+YFINANCE_INFO_TIMEOUT = 15
 
 
 @dataclass(frozen=True)
@@ -112,13 +117,24 @@ def _download_to_long_frame(downloaded: pd.DataFrame, tickers: tuple[str, ...]) 
     records = []
     if isinstance(downloaded.columns, pd.MultiIndex):
         level_zero = set(map(str, downloaded.columns.get_level_values(0)))
-        ticker_first = set(tickers).issubset(level_zero)
+        level_one = set(map(str, downloaded.columns.get_level_values(1)))
+        ticker_first = any(ticker in level_zero for ticker in tickers)
 
         for ticker in tickers:
-            if ticker_first:
-                one = downloaded[ticker].copy()
-            else:
-                one = downloaded.xs(ticker, axis=1, level=1).copy()
+            try:
+                if ticker_first:
+                    if ticker not in level_zero:
+                        LOGGER.warning("No market data returned for %s", ticker)
+                        continue
+                    one = downloaded[ticker].copy()
+                else:
+                    if ticker not in level_one:
+                        LOGGER.warning("No market data returned for %s", ticker)
+                        continue
+                    one = downloaded.xs(ticker, axis=1, level=1).copy()
+            except KeyError:
+                LOGGER.warning("Could not parse market data returned for %s", ticker)
+                continue
             one = one.reset_index()
             one["ticker"] = ticker
             records.append(_normalize_columns(one))
@@ -127,7 +143,7 @@ def _download_to_long_frame(downloaded: pd.DataFrame, tickers: tuple[str, ...]) 
         one["ticker"] = tickers[0]
         records.append(_normalize_columns(one))
 
-    return pd.concat(records, ignore_index=True, sort=False)
+    return pd.concat(records, ignore_index=True, sort=False) if records else pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
 
 
 def download_price_data(
@@ -147,16 +163,29 @@ def download_price_data(
 
     ticker_tuple = tuple(tickers)
     LOGGER.info("Downloading price data for %s from %s to %s", ticker_tuple, start, end)
-    downloaded = yf.download(
-        list(ticker_tuple),
-        start=start,
-        end=end,
-        auto_adjust=False,
-        actions=True,
-        group_by="ticker",
-        progress=False,
-        threads=True,
-    )
+    download_kwargs = {
+        "tickers": list(ticker_tuple),
+        "start": start,
+        "end": end,
+        "auto_adjust": False,
+        "actions": True,
+        "group_by": "ticker",
+        "progress": False,
+        "threads": True,
+    }
+    try:
+        if "timeout" in inspect.signature(yf.download).parameters:
+            download_kwargs["timeout"] = YFINANCE_DOWNLOAD_TIMEOUT
+    except (TypeError, ValueError):
+        LOGGER.warning("Could not inspect yfinance.download timeout support")
+
+    try:
+        downloaded = yf.download(**download_kwargs)
+    except Exception as exc:  # pragma: no cover - network/provider edge
+        if is_yahoo_rate_limit_error(exc):
+            raise
+        LOGGER.warning("Could not download market data for %s: %s", ticker_tuple, exc)
+        return pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
     long_frame = _download_to_long_frame(downloaded, ticker_tuple)
 
     if raw_dir is not None:
@@ -166,6 +195,85 @@ def download_price_data(
             group.to_csv(raw_path / f"{ticker}.csv", index=False)
 
     return long_frame
+
+
+def is_yahoo_rate_limit_error(error: BaseException) -> bool:
+    """Recognize provider throttling across yfinance versions and HTTP clients."""
+
+    if error.__class__.__name__ == "YFRateLimitError":
+        return True
+    status_code = getattr(error, "status_code", None)
+    if status_code == 429:
+        return True
+    message = str(error).lower()
+    return "too many requests" in message or "rate limited" in message or "status code 429" in message
+
+
+def fetch_live_ticker_quote(ticker: str, timeout: float = 30) -> dict[str, object]:
+    """Fetch one lightweight quote window without writing any market-data files."""
+
+    if yf is None:
+        raise ImportError("yfinance is required. Install project requirements first.")
+
+    ticker_client = yf.Ticker(ticker)
+    recent = ticker_client.history(
+        period="1d",
+        interval="1m",
+        prepost=False,
+        actions=False,
+        auto_adjust=False,
+        timeout=timeout,
+    )
+    if recent.empty:
+        recent = ticker_client.history(
+            period="5d",
+            interval="1d",
+            prepost=False,
+            actions=False,
+            auto_adjust=False,
+            timeout=timeout,
+        )
+    if recent.empty:
+        raise ValueError("data provider returned no live quote rows")
+
+    price_column = "Close" if "Close" in recent.columns else "close"
+    if price_column not in recent.columns:
+        raise ValueError("data provider returned no close price")
+    prices = pd.to_numeric(recent[price_column], errors="coerce").dropna()
+    if prices.empty:
+        raise ValueError("data provider returned no usable close price")
+
+    timestamp = pd.Timestamp(prices.index[-1])
+    return {
+        "price": float(prices.iloc[-1]),
+        "market_data_timestamp": timestamp.isoformat(),
+    }
+
+
+def fetch_ticker_history(
+    ticker: str,
+    start: str,
+    end: str,
+    timeout: float = 30,
+) -> pd.DataFrame:
+    """Fetch one ticker's historical base directly so provider errors propagate."""
+
+    if yf is None:
+        raise ImportError("yfinance is required. Install project requirements first.")
+
+    history = yf.Ticker(ticker).history(
+        start=start,
+        end=end,
+        prepost=False,
+        actions=True,
+        auto_adjust=False,
+        timeout=timeout,
+    )
+    if history.empty:
+        return pd.DataFrame(columns=("date", "ticker", *PRICE_COLUMNS))
+    frame = history.reset_index()
+    frame["ticker"] = ticker
+    return _normalize_columns(frame)
 
 
 def clean_price_data(
@@ -196,16 +304,20 @@ def clean_price_data(
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
 
     price_cols = ["open", "high", "low", "close", "adj_close"]
-    frame[price_cols] = frame.groupby("ticker", group_keys=False)[price_cols].apply(
-        lambda group: group.ffill().bfill()
-    )
+    # Forward-fill only. Backfilling a missing historical quote would copy a
+    # future observation into the past and contaminate a backtest.
+    for column in price_cols:
+        frame[column] = frame.groupby("ticker")[column].ffill()
     frame["volume"] = frame["volume"].fillna(0).clip(lower=0)
     frame["dividends"] = frame["dividends"].fillna(0)
     frame["stock_splits"] = frame["stock_splits"].fillna(0)
     frame["adj_close"] = frame["adj_close"].fillna(frame["close"])
+    frame = frame.dropna(subset=["open", "high", "low", "close", "adj_close"]).copy()
 
     adjustment_factor = frame["adj_close"].div(frame["close"]).replace([np.inf, -np.inf], np.nan)
-    adjustment_factor = adjustment_factor.groupby(frame["ticker"]).ffill().bfill().fillna(1.0)
+    # Forward-fill only. Backfilling a later corporate-action factor would
+    # leak future split/dividend information into earlier observations.
+    adjustment_factor = adjustment_factor.groupby(frame["ticker"]).ffill().fillna(1.0)
     frame["adjustment_factor"] = adjustment_factor
 
     for column in ("open", "high", "low", "close"):
@@ -279,10 +391,21 @@ def load_fundamental_features(tickers: tuple[str, ...] | list[str]) -> pd.DataFr
     for ticker in tickers:
         info: dict[str, object] = {}
         if yf is not None:
-            try:
-                info = yf.Ticker(ticker).info or {}
-            except Exception as exc:  # pragma: no cover - network/provider edge
-                LOGGER.warning("Could not load fundamentals for %s: %s", ticker, exc)
+            result: list[dict[str, object]] = []
+
+            def fetch_info() -> None:
+                try:
+                    result.append(yf.Ticker(ticker).info or {})
+                except Exception as exc:  # pragma: no cover - network/provider edge
+                    LOGGER.warning("Could not load fundamentals for %s: %s", ticker, exc)
+
+            worker = threading.Thread(target=fetch_info, daemon=True)
+            worker.start()
+            worker.join(YFINANCE_INFO_TIMEOUT)
+            if worker.is_alive():
+                LOGGER.warning("Timed out loading fundamentals for %s", ticker)
+            elif result:
+                info = result[0]
 
         rows.append(
             {
@@ -358,10 +481,25 @@ def create_feature_dataset(
 
 
 def expected_latest_market_date(today: str | pd.Timestamp | None = None) -> pd.Timestamp:
-    """Return the latest fully closed US equity business date expected in local data."""
+    """Return the latest US equity daily bar that should be available locally.
 
-    current = pd.Timestamp.today().normalize() if today is None else pd.Timestamp(today).normalize()
-    return (current - pd.tseries.offsets.BDay(1)).normalize()
+    Before the regular US close plus a short data-provider buffer, yesterday's
+    business day is the latest complete daily candle. After that buffer, the
+    current business day should be present.
+    """
+
+    current = pd.Timestamp.now(tz="America/Los_Angeles") if today is None else pd.Timestamp(today)
+    if current.tzinfo is not None:
+        current = current.tz_convert("America/Los_Angeles").tz_localize(None)
+
+    current_date = current.normalize()
+    if current.weekday() >= 5:
+        return (current_date - pd.tseries.offsets.BDay(1)).normalize()
+
+    data_ready_after = time(14, 0)
+    if current.time() >= data_ready_after:
+        return current_date
+    return (current_date - pd.tseries.offsets.BDay(1)).normalize()
 
 
 def next_yfinance_end_date(today: str | pd.Timestamp | None = None) -> str:

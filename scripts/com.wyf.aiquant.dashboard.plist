@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.wyf.aiquant.dashboard</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/wangyunfei/AIQuantRuntime/scripts/run_dashboard_launchd.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>QTF_AUTO_REFRESH_DATA</key>
+    <string>1</string>
+    <key>STREAMLIT_BROWSER_GATHER_USAGE_STATS</key>
+    <string>false</string>
+    <key>STREAMLIT_SERVER_HEADLESS</key>
+    <string>true</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/wangyunfei/AIQuantRuntime/logs/dashboard-launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/wangyunfei/AIQuantRuntime/logs/dashboard-launchd.err.log</string>
+</dict>
+</plist>

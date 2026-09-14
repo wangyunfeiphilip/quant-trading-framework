@@ -7,9 +7,13 @@ import json
 import os
 import shutil
 import tempfile
+from datetime import datetime, time as datetime_time, timezone
 from html import escape
 from pathlib import Path
 import sys
+import threading
+import time
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -30,6 +34,9 @@ from data.data_loader import (
     clean_price_data,
     create_feature_dataset,
     download_price_data,
+    fetch_live_ticker_quote,
+    fetch_ticker_history,
+    is_yahoo_rate_limit_error,
     load_fundamental_features,
 )
 from derivatives.black_scholes import OptionContract, black_scholes_greeks, black_scholes_price
@@ -76,13 +83,23 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 INVESTMENT_RESULTS_DIR = RESULTS_DIR / "investment_platform"
 DEMO_DATA_DIR = PROJECT_ROOT / "demo_data"
+DEMO_INVESTMENT_RESULTS_DIR = DEMO_DATA_DIR / "results" / "investment_platform"
 AUTO_REFRESH_DATA = os.getenv("QTF_AUTO_REFRESH_DATA", "1").strip().lower() not in {"0", "false", "no"}
+LIVE_HISTORY_TTL = 1800
+LIVE_FUNDAMENTALS_TTL = 14400
+LIVE_QUOTE_TTL = 30
+LIVE_RATE_LIMIT_COOLDOWN = 300
+_live_quote_memory: dict[str, dict[str, object]] = {}
+_live_history_memory: dict[str, pd.DataFrame] = {}
+_live_quote_lock = threading.Lock()
+_live_rate_limit_until = 0.0
 
 
 st.set_page_config(
     page_title="Quant Research Terminal",
     page_icon="Q",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
@@ -857,6 +874,445 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Visual-only editorial layer for the original English terminal.
+# Keep the existing navigation, callbacks, data reads, and research logic intact.
+st.markdown(
+    """
+    <style>
+    :root {
+        --qtf-paper: #f4f3ee;
+        --qtf-white: #ffffff;
+        --qtf-ink: #151515;
+        --qtf-muted: #77756d;
+        --qtf-line: rgba(21, 21, 21, 0.15);
+        --qtf-black: #090909;
+        --qtf-accent: #d8bb66;
+    }
+
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        background: var(--qtf-paper) !important;
+        color: var(--qtf-ink) !important;
+    }
+    header[data-testid="stHeader"] {
+        background: rgba(244, 243, 238, 0.96) !important;
+        border-bottom: 1px solid var(--qtf-line) !important;
+        box-shadow: none !important;
+    }
+    div[data-testid="stDecoration"] { display: none !important; }
+    .block-container {
+        max-width: 1440px !important;
+        padding: 1rem 2.2rem 4.5rem !important;
+    }
+    .main .block-container > div { animation: qtf-enter 360ms ease both; }
+    @keyframes qtf-enter {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    [data-testid="stSidebar"] {
+        display: block !important;
+        visibility: visible !important;
+        background: #efeee8 !important;
+        border-right: 1px solid var(--qtf-line) !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] > div:first-child { width: 18rem !important; }
+    [data-testid="stSidebar"] * { color: var(--qtf-ink) !important; }
+    [data-testid="stSidebar"] .sidebar-brand {
+        background: transparent !important;
+        border: 0 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.14) !important;
+        border-radius: 0 !important;
+        padding: 10px 0 20px !important;
+        margin: 0 0 18px !important;
+    }
+    [data-testid="stSidebar"] .sidebar-mark {
+        width: 30px !important;
+        height: 30px !important;
+        border-radius: 4px !important;
+        background: var(--qtf-black) !important;
+        color: var(--qtf-accent) !important;
+        font-size: 0.68rem !important;
+    }
+    [data-testid="stSidebar"] .sidebar-name {
+        color: #8b701d !important;
+        font-size: 0.98rem !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stSidebar"] .sidebar-desc,
+    [data-testid="stSidebar"] .stCaption { color: var(--qtf-muted) !important; }
+    [data-testid="stSidebar"] [role="radiogroup"] label {
+        border-radius: 3px !important;
+        padding: 8px 9px !important;
+        margin: 2px 0 !important;
+        transition: background 160ms ease, transform 160ms ease !important;
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background: rgba(216, 187, 102, 0.12) !important;
+        transform: translateX(2px);
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label[data-checked="true"] {
+        background: var(--qtf-black) !important;
+        color: var(--qtf-accent) !important;
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] label[data-checked="true"] * { color: var(--qtf-accent) !important; }
+
+    .console-nav {
+        background: transparent !important;
+        border-bottom: 1px solid var(--qtf-line) !important;
+        padding: 0 0 12px !important;
+        margin-bottom: 34px !important;
+        gap: 8px !important;
+    }
+    .console-nav a, .console-nav button {
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 4px !important;
+        background: transparent !important;
+        color: var(--qtf-ink) !important;
+        transition: background 160ms ease, color 160ms ease, transform 160ms ease !important;
+    }
+    .console-nav a:hover, .console-nav button:hover,
+    .console-nav a.active, .console-nav button.active {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
+        transform: translateY(-1px);
+    }
+
+    .terminal-title {
+        background: transparent !important;
+        border: 0 !important;
+        border-bottom: 1px solid var(--qtf-line) !important;
+        border-radius: 0 !important;
+        padding: 18px 0 24px !important;
+        margin-bottom: 28px !important;
+    }
+    .terminal-title .eyebrow {
+        color: #8b701d !important;
+        font-size: 0.72rem !important;
+        letter-spacing: 0.16em !important;
+    }
+    .terminal-title .title {
+        color: var(--qtf-ink) !important;
+        font-size: clamp(2.4rem, 5vw, 5.6rem) !important;
+        line-height: 0.98 !important;
+        font-weight: 750 !important;
+        letter-spacing: 0 !important;
+    }
+    .terminal-title .subtitle { color: var(--qtf-muted) !important; }
+
+    .home-hero {
+        background: var(--qtf-paper) !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        padding: 26px 0 44px !important;
+        box-shadow: none !important;
+    }
+    .hero-content { gap: 48px !important; }
+    .hero-title {
+        color: var(--qtf-ink) !important;
+        font-size: clamp(3.2rem, 7vw, 7.8rem) !important;
+        line-height: 0.9 !important;
+        letter-spacing: 0 !important;
+        font-weight: 780 !important;
+    }
+    .hero-title span { color: var(--qtf-accent) !important; }
+    .hero-copy { color: var(--qtf-muted) !important; max-width: 760px !important; }
+    .hero-panel {
+        background: var(--qtf-black) !important;
+        border: 1px solid #323232 !important;
+        border-radius: 8px !important;
+        color: var(--qtf-ink) !important;
+        box-shadow: none !important;
+    }
+    .hero-panel * { color: inherit; }
+    .hero-panel .panel-label { color: var(--qtf-accent) !important; }
+    .hero-metrics { gap: 0 !important; margin-top: 38px !important; }
+    .hero-metric {
+        background: transparent !important;
+        border: 0 !important;
+        border-top: 1px solid var(--qtf-line) !important;
+        border-radius: 0 !important;
+        padding: 18px 12px 0 0 !important;
+    }
+    .hero-metric .metric-value { color: var(--qtf-accent) !important; }
+    .hero-metric .metric-label { color: var(--qtf-muted) !important; }
+
+    .feature-grid {
+        background: var(--qtf-paper) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        gap: 0 !important;
+    }
+    .feature-card {
+        background: var(--qtf-paper) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-top: 2px solid var(--qtf-accent) !important;
+        border-radius: 8px !important;
+        padding: 24px 22px 28px !important;
+        min-height: 210px !important;
+        transition: transform 180ms ease, border-color 180ms ease !important;
+    }
+    .feature-card:hover { transform: translateY(-3px); border-color: var(--qtf-accent) !important; }
+    .feature-card * { color: #8b701d !important; }
+    .feature-card p, .feature-card .feature-copy { color: #8b701d !important; }
+    .feature-card .feature-index { color: var(--qtf-accent) !important; }
+
+    .workspace-frame {
+        background: transparent !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 8px !important;
+        color: var(--qtf-ink) !important;
+        box-shadow: none !important;
+    }
+    .workspace-frame:before { color: #8b701d !important; }
+    h1, h2, h3, h4, p, label, .stMarkdown { color: var(--qtf-ink); }
+    [data-testid="stMetric"] {
+        background: var(--qtf-white) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stMetric"] label,
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: var(--qtf-accent) !important;
+    }
+    [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] > div {
+        background: var(--qtf-white) !important;
+        border-color: var(--qtf-line) !important;
+        border-radius: 4px !important;
+        color: var(--qtf-ink) !important;
+    }
+    [data-testid="stTextInput"] input::placeholder {
+        color: rgba(248,246,239,0.55) !important;
+    }
+    .stButton > button, .stDownloadButton > button {
+        background: transparent !important;
+        color: #8b701d !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 4px !important;
+        transition: transform 160ms ease, background 160ms ease !important;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
+        transform: translateY(-1px);
+    }
+    .stButton > button *, .stDownloadButton > button * {
+        color: #8b701d !important;
+    }
+    .stButton > button:hover *, .stDownloadButton > button:hover * {
+        color: #15120e !important;
+    }
+    [data-baseweb="popover"], [role="listbox"] {
+        background: #2a2722 !important;
+        border: 1px solid var(--qtf-line) !important;
+    }
+    [role="option"] { color: var(--qtf-ink) !important; }
+    [role="option"][aria-selected="true"] {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
+    }
+    [data-testid="stDataFrame"], [data-testid="stPlotlyChart"] {
+        background: var(--qtf-white) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-radius: 4px !important;
+    }
+    .stAlert { border-radius: 4px !important; }
+
+    .back-home-row {
+        display: flex;
+        justify-content: flex-start;
+        margin: -12px 0 18px;
+    }
+    .back-home-row .stButton > button {
+        background: transparent !important;
+        color: var(--qtf-ink) !important;
+        border-color: var(--qtf-line) !important;
+        box-shadow: none !important;
+    }
+    .back-home-row .stButton > button:hover {
+        background: var(--qtf-black) !important;
+        color: var(--qtf-accent) !important;
+    }
+    .back-home-row .stButton > button * {
+        color: var(--qtf-accent) !important;
+    }
+    .back-home-row .stButton > button:hover * { color: #15120e !important; }
+
+    /* Streamlit widget text needs explicit contrast because the legacy theme
+       styles several nested elements with white !important. */
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stMarkdownContainer"] p,
+    .stApp [data-testid="stMarkdownContainer"] li,
+    .stApp [data-testid="stCaptionContainer"] *,
+    .stApp [data-testid="stText"] {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stWidgetLabel"] *,
+    .stApp [data-testid="stCaptionContainer"] * {
+        color: #8b701d !important;
+    }
+    .stApp .stButton > button,
+    .stApp .stButton > button *,
+    .stApp .stDownloadButton > button,
+    .stApp .stDownloadButton > button * {
+        color: #8b701d !important;
+        text-shadow: none !important;
+    }
+    .stApp .stButton > button,
+    .stApp .stDownloadButton > button {
+        background: transparent !important;
+        border: 1px solid rgba(139,112,29,0.42) !important;
+    }
+    .stApp .stButton > button:hover,
+    .stApp .stButton > button:hover *,
+    .stApp .stDownloadButton > button:hover,
+    .stApp .stDownloadButton > button:hover * {
+        background: var(--qtf-accent) !important;
+        color: #15120e !important;
+    }
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    .stApp [data-testid="stTextInput"] input,
+    .stApp [data-testid="stNumberInput"] input {
+        background: #ffffff !important;
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stSelectbox"] [data-baseweb="select"] *,
+    .stApp [data-testid="stTextInput"] input,
+    .stApp [data-testid="stNumberInput"] input {
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stTextInput"] input::placeholder,
+    .stApp [data-testid="stNumberInput"] input::placeholder,
+    .stApp [data-testid="stSelectbox"] input::placeholder {
+        color: var(--qtf-muted) !important;
+        -webkit-text-fill-color: var(--qtf-muted) !important;
+        opacity: 1 !important;
+    }
+    .stApp [data-testid="stSelectbox"] svg,
+    .stApp [data-testid="stNumberInput"] svg,
+    .stApp [data-testid="stTextInput"] svg {
+        fill: var(--qtf-ink) !important;
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-baseweb="popover"],
+    .stApp [role="listbox"] {
+        background: #ffffff !important;
+    }
+    .stApp [role="option"],
+    .stApp [role="option"] * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [role="option"][aria-selected="true"],
+    .stApp [role="option"][aria-selected="true"] * {
+        background: #efe5c6 !important;
+        color: #6f5714 !important;
+    }
+    .stApp .feature-card {
+        background: var(--qtf-paper) !important;
+        border: 1px solid rgba(139,112,29,0.32) !important;
+        border-top: 2px solid var(--qtf-accent) !important;
+        box-shadow: 0 8px 24px rgba(21,21,21,0.05) !important;
+    }
+    .stApp .feature-card *,
+    .stApp .feature-card .feature-title,
+    .stApp .feature-card .feature-copy,
+    .stApp .feature-card .feature-index {
+        color: #8b701d !important;
+    }
+    .stApp .workspace-frame {
+        background: transparent !important;
+        border: 1px solid var(--qtf-line) !important;
+        color: var(--qtf-ink) !important;
+    }
+    /* BaseWeb renders select menus in a portal outside .stApp. Keep the
+       portal and its options in the same light surface as the terminal. */
+    [data-baseweb="popover"],
+    [data-baseweb="popover"] > div,
+    [role="listbox"] {
+        background: var(--qtf-paper) !important;
+        border-color: var(--qtf-line) !important;
+        color: var(--qtf-ink) !important;
+    }
+    [role="option"],
+    [role="option"] > div,
+    [role="option"] span {
+        background: var(--qtf-paper) !important;
+        color: var(--qtf-ink) !important;
+        -webkit-text-fill-color: var(--qtf-ink) !important;
+    }
+    [role="option"]:hover,
+    [role="option"]:hover > div,
+    [role="option"][aria-selected="true"],
+    [role="option"][aria-selected="true"] > div {
+        background: #efe5c6 !important;
+        color: #6f5714 !important;
+        -webkit-text-fill-color: #6f5714 !important;
+    }
+    .stApp .signal-panel {
+        background: var(--qtf-paper) !important;
+        border: 1px solid var(--qtf-line) !important;
+        border-left-width: 4px !important;
+        color: var(--qtf-ink) !important;
+        box-shadow: 0 8px 24px rgba(21,21,21,0.06) !important;
+    }
+    .stApp .signal-panel .signal-headline,
+    .stApp .signal-panel ul,
+    .stApp .signal-panel li,
+    .stApp .signal-panel .signal-note {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp .signal-panel .signal-note { color: var(--qtf-muted) !important; }
+    .stApp .signal-panel .signal-badge {
+        color: #6f5714 !important;
+        background: #efe5c6 !important;
+        border-color: rgba(139,112,29,0.42) !important;
+    }
+    .stApp [data-testid="stAlert"],
+    .stApp .stAlert,
+    .stApp [data-testid="stAlert"] * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stExpander"] summary,
+    .stApp [data-testid="stExpander"] summary * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stRadio"] label,
+    .stApp [data-testid="stRadio"] label * ,
+    .stApp [data-testid="stCheckbox"] label,
+    .stApp [data-testid="stCheckbox"] label * ,
+    .stApp [data-testid="stSlider"] label,
+    .stApp [data-testid="stSlider"] label * {
+        color: var(--qtf-ink) !important;
+    }
+    .stApp [data-testid="stDataFrame"] *,
+    .stApp [data-testid="stTable"] * {
+        color: var(--qtf-ink) !important;
+    }
+
+    @media (max-width: 900px) {
+        .block-container { padding: 0.75rem 1rem 3rem !important; }
+        .hero-content { grid-template-columns: 1fr !important; gap: 28px !important; }
+        .hero-title { font-size: clamp(3rem, 15vw, 6rem) !important; }
+        .feature-grid { padding: 20px !important; }
+    }
+    @media (max-width: 560px) {
+        .console-nav { overflow-x: auto !important; flex-wrap: nowrap !important; }
+        .console-nav a, .console-nav button { white-space: nowrap !important; }
+        .home-hero { padding-top: 12px !important; }
+        .hero-panel { padding: 22px !important; }
+        .hero-metrics { grid-template-columns: 1fr 1fr !important; }
+        .feature-card { min-height: 0 !important; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def resolve_data_path(path: str | Path) -> Path:
     file_path = Path(path)
@@ -883,7 +1339,10 @@ def read_csv(signature: tuple[str, float, int]) -> pd.DataFrame:
     if size == 0:
         return pd.DataFrame()
     file_path = Path(path)
-    return pd.read_csv(file_path)
+    try:
+        return pd.read_csv(file_path)
+    except (OSError, UnicodeError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame()
 
 
 @st.cache_data(show_spinner=False)
@@ -906,9 +1365,12 @@ def load_config_tickers() -> list[str]:
 @st.cache_data(show_spinner=False)
 def load_features() -> pd.DataFrame:
     frame = read_csv(file_signature(PROCESSED_DIR / "feature_dataset.csv"))
-    if frame.empty:
+    if frame.empty or not {"date", "ticker"}.issubset(frame.columns):
         return frame
-    frame["date"] = pd.to_datetime(frame["date"])
+    try:
+        frame["date"] = pd.to_datetime(frame["date"])
+    except (TypeError, ValueError):
+        return pd.DataFrame()
     return frame.sort_values(["date", "ticker"]).reset_index(drop=True)
 
 
@@ -971,8 +1433,10 @@ def maybe_auto_refresh_project_data(tickers: list[str], start: str, features: pd
     with st.spinner("Refreshing project market data from yfinance..."):
         try:
             refreshed = refresh_project_market_data(tickers, start)
-        except Exception as exc:
-            st.session_state["project_data_refresh_error"] = str(exc)
+        except Exception:
+            st.session_state["project_data_refresh_error"] = (
+                "Yahoo Finance is temporarily unavailable; the existing project dataset was kept."
+            )
             return features
 
     st.session_state["project_data_refresh_error"] = ""
@@ -996,6 +1460,8 @@ def render_project_data_status(features: pd.DataFrame, tickers: list[str], start
         st.warning(f"{status_text} Local data may be stale.")
     else:
         st.caption(f"{status_text} Data is current enough for daily research.")
+    if not AUTO_REFRESH_DATA:
+        st.caption("Automatic market-data refresh is disabled for this public deployment.")
 
     if st.session_state.get("project_data_refresh_error"):
         st.caption(f"Last automatic refresh failed: {st.session_state['project_data_refresh_error']}")
@@ -1004,8 +1470,8 @@ def render_project_data_status(features: pd.DataFrame, tickers: list[str], start
         with st.spinner("Rebuilding project universe data, fundamentals, and technical features..."):
             try:
                 refreshed = refresh_project_market_data(tickers, start)
-            except Exception as exc:
-                st.error(f"Project dataset refresh failed: {exc}")
+            except Exception:
+                st.error("Yahoo Finance is temporarily unavailable. The existing project dataset was kept.")
                 return features
         st.success(f"Project dataset refreshed through {latest_market_date(refreshed).date()}.")
         return load_features()
@@ -1023,25 +1489,44 @@ def normalize_ticker(value: str) -> str:
     return ticker
 
 
-@st.cache_data(show_spinner=True, ttl=3600)
-def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
-    raw = download_price_data([ticker], start=start, end=end, raw_dir=None)
+@st.cache_data(show_spinner=False, ttl=LIVE_HISTORY_TTL)
+def load_external_ticker_prices(ticker: str, start: str, end: str) -> pd.DataFrame:
+    raw = fetch_ticker_history(ticker, start=start, end=end)
     if raw.empty:
         raise ValueError("data provider returned no price rows")
+    return raw
+
+
+@st.cache_data(show_spinner=False, ttl=LIVE_FUNDAMENTALS_TTL)
+def load_external_ticker_fundamentals(ticker: str) -> pd.DataFrame:
+    return load_fundamental_features([ticker])
+
+
+@st.cache_data(show_spinner=False, ttl=LIVE_HISTORY_TTL)
+def load_external_ticker_features(ticker: str, start: str, end: str) -> pd.DataFrame:
+    raw = load_external_ticker_prices(ticker, start=start, end=end)
 
     clean = clean_price_data(raw)
-    fundamentals = load_fundamental_features([ticker])
+    fundamentals = load_external_ticker_fundamentals(ticker)
     features = create_feature_dataset(clean, fundamentals=fundamentals)
     features["date"] = pd.to_datetime(features["date"])
     return features.sort_values(["date", "ticker"]).reset_index(drop=True)
 
 
+@st.cache_data(show_spinner=False, ttl=LIVE_QUOTE_TTL)
+def load_live_ticker_quote(ticker: str) -> dict[str, object]:
+    return fetch_live_ticker_quote(ticker)
+
+
 @st.cache_data(show_spinner=False)
 def load_portfolio_value() -> pd.DataFrame:
     frame = read_csv(file_signature(RESULTS_DIR / "portfolio_value.csv"))
-    if frame.empty:
+    if frame.empty or "date" not in frame.columns:
         return frame
-    frame["date"] = pd.to_datetime(frame["date"])
+    try:
+        frame["date"] = pd.to_datetime(frame["date"])
+    except (TypeError, ValueError):
+        return pd.DataFrame()
     return frame.sort_values("date").reset_index(drop=True)
 
 
@@ -1056,7 +1541,11 @@ def load_investment_snapshot(signature: tuple[str, float, int]) -> dict:
     path, _, size = signature
     if size == 0:
         return {}
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 @st.cache_data(show_spinner=False)
@@ -1064,7 +1553,10 @@ def load_latest_investment_report(signature: tuple[str, float, int]) -> str:
     path, _, size = signature
     if size == 0:
         return ""
-    return Path(path).read_text(encoding="utf-8")
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def latest_investment_snapshot_path() -> Path:
@@ -1072,16 +1564,79 @@ def latest_investment_snapshot_path() -> Path:
     if preferred.exists():
         return preferred
     candidates = sorted(INVESTMENT_RESULTS_DIR.glob("run_snapshot_*.json"))
-    return candidates[-1] if candidates else preferred
+    if candidates:
+        return candidates[-1]
+
+    public_demo = DEMO_INVESTMENT_RESULTS_DIR / "latest_snapshot.json"
+    return public_demo if public_demo.exists() else preferred
+
+
+def repo_path_if_exists(value: str | Path) -> Path | None:
+    """Resolve report paths without allowing local snapshots to escape the repo."""
+
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = PROJECT_ROOT / candidate
+    try:
+        resolved = candidate.resolve()
+        resolved.relative_to(PROJECT_ROOT.resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved if resolved.exists() else None
 
 
 def latest_investment_report_path(snapshot: dict) -> Path:
     if snapshot.get("report_path"):
-        path = PROJECT_ROOT / str(snapshot["report_path"])
-        if path.exists():
+        path = repo_path_if_exists(str(snapshot["report_path"]))
+        if path is not None:
             return path
     candidates = sorted(INVESTMENT_RESULTS_DIR.glob("daily_report_*.md"))
-    return candidates[-1] if candidates else INVESTMENT_RESULTS_DIR / "daily_report.md"
+    if candidates:
+        return candidates[-1]
+    public_demo = DEMO_INVESTMENT_RESULTS_DIR / "public_demo_report.md"
+    return public_demo if public_demo.exists() else INVESTMENT_RESULTS_DIR / "daily_report.md"
+
+
+def available_columns(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Select only columns present in public or locally generated snapshots."""
+
+    present = [column for column in columns if column in frame.columns]
+    return frame[present] if present else pd.DataFrame()
+
+
+def snapshot_frame(value: object) -> pd.DataFrame:
+    """Turn optional snapshot rows into a safe table without assuming a schema."""
+
+    if not isinstance(value, list):
+        return pd.DataFrame()
+    try:
+        return pd.DataFrame(value)
+    except (TypeError, ValueError):
+        return pd.DataFrame()
+
+
+def snapshot_mapping(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def snapshot_list(value: object) -> list:
+    return value if isinstance(value, list) else []
+
+
+def snapshot_number(value: object, default: float | None = None) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if np.isfinite(number) else default
+
+
+def render_snapshot_table(frame: pd.DataFrame, columns: list[str]) -> None:
+    shown = available_columns(frame, columns)
+    if shown.empty:
+        render_missing_results()
+    else:
+        st.dataframe(shown, width="stretch", hide_index=True)
 
 
 def metric_value(series: pd.Series, key: str, precision: int = 3) -> str:
@@ -1406,29 +1961,33 @@ def render_ai_investment_platform() -> None:
     snapshot_path = latest_investment_snapshot_path()
     snapshot = load_investment_snapshot(file_signature(snapshot_path))
     if not snapshot:
-        st.info("No AI investment research snapshot was found. Run `python3 scripts/run_investment_platform.py --config investment_platform.json` first.")
+        st.info("No AI investment research snapshot is available. Local-only research files are not required for the public demo.")
         return
 
-    regime = snapshot.get("market_regime", {})
-    weights = snapshot.get("factor_weights", {})
-    scores = pd.DataFrame(snapshot.get("scores", []))
-    theses = pd.DataFrame(snapshot.get("theses", []))
-    valuations = pd.DataFrame(snapshot.get("valuations", []))
-    sizing = pd.DataFrame(snapshot.get("sizing", []))
-    prediction_summary = snapshot.get("prediction_summary", {})
-    sentiment = pd.DataFrame(snapshot.get("sentiment", []))
-    behaviors = snapshot.get("behaviors", [])
-    integrations = pd.DataFrame(snapshot.get("integrations", []))
+    if snapshot.get("public_demo"):
+        st.info("PUBLIC DEMO snapshot: no personal holdings, brokerage records, or private account data are included.")
+
+    regime = snapshot_mapping(snapshot.get("market_regime"))
+    weights = snapshot_mapping(snapshot.get("factor_weights"))
+    scores = snapshot_frame(snapshot.get("scores"))
+    theses = snapshot_frame(snapshot.get("theses"))
+    valuations = snapshot_frame(snapshot.get("valuations"))
+    sizing = snapshot_frame(snapshot.get("sizing"))
+    prediction_summary = snapshot_mapping(snapshot.get("prediction_summary"))
+    sentiment = snapshot_frame(snapshot.get("sentiment"))
+    behaviors = snapshot_list(snapshot.get("behaviors"))
+    integrations = snapshot_frame(snapshot.get("integrations"))
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Market Regime", regime.get("name", "NA"))
-    col2.metric("Regime Confidence", percent_value(float(regime.get("confidence", 0.0))))
-    col3.metric("Prediction Accuracy", percent_value(float(prediction_summary.get("accuracy", 0.0))))
-    col4.metric("Evaluated Forecasts", str(int(prediction_summary.get("evaluated", 0))))
+    col2.metric("Regime Confidence", percent_value(snapshot_number(regime.get("confidence"))))
+    col3.metric("Prediction Accuracy", percent_value(snapshot_number(prediction_summary.get("accuracy"))))
+    evaluated = snapshot_number(prediction_summary.get("evaluated"))
+    col4.metric("Evaluated Forecasts", str(int(evaluated)) if evaluated is not None else "NA")
 
     st.subheader("Dynamic Factor Weights")
     weight_cols = ["growth", "quality", "momentum", "value", "risk"]
-    weight_values = [float(weights.get(column, 0.0)) for column in weight_cols]
+    weight_values = [snapshot_number(weights.get(column), default=0.0) or 0.0 for column in weight_cols]
     fig = go.Figure(data=[go.Bar(x=[item.title() for item in weight_cols], y=weight_values)])
     fig.update_layout(height=320, margin=dict(l=20, r=20, t=25, b=20), yaxis_tickformat=".0%")
     st.plotly_chart(fig, width="stretch")
@@ -1437,11 +1996,7 @@ def render_ai_investment_platform() -> None:
     left, right = st.columns([3, 2])
     with left:
         st.subheader("Composite Stock Ranking")
-        if scores.empty:
-            render_missing_results()
-        else:
-            shown = scores[["ticker", "total_score", "factor_scores", "explanation"]].copy()
-            st.dataframe(shown, width="stretch", hide_index=True)
+        render_snapshot_table(scores, ["ticker", "total_score", "factor_scores", "explanation"])
     with right:
         st.subheader("Market Drivers")
         for driver in regime.get("drivers", []):
@@ -1453,32 +2008,20 @@ def render_ai_investment_platform() -> None:
                 st.write(f"- {caution}")
 
     st.subheader("Investment Thesis Tracking")
-    if theses.empty:
-        render_missing_results()
-    else:
-        st.dataframe(theses[["ticker", "thesis", "status", "triggered_conditions"]], width="stretch", hide_index=True)
+    render_snapshot_table(theses, ["ticker", "thesis", "status", "triggered_conditions"])
 
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Scenario Valuation")
-        if valuations.empty:
-            render_missing_results()
-        else:
-            st.dataframe(valuations[["ticker", "weighted_fair_value", "upside_to_price"]], width="stretch", hide_index=True)
+        render_snapshot_table(valuations, ["ticker", "weighted_fair_value", "upside_to_price"])
     with col_right:
         st.subheader("Position Suggestions")
-        if sizing.empty:
-            render_missing_results()
-        else:
-            st.dataframe(sizing[["ticker", "current_allocation", "max_allocation", "suggested_action", "reasons"]], width="stretch", hide_index=True)
+        render_snapshot_table(sizing, ["ticker", "current_allocation", "max_allocation", "suggested_action", "reasons"])
 
     col_left, col_right = st.columns(2)
     with col_left:
         st.subheader("Market Sentiment")
-        if sentiment.empty:
-            render_missing_results()
-        else:
-            st.dataframe(sentiment[["ticker", "label", "speculation_risk", "reasons"]], width="stretch", hide_index=True)
+        render_snapshot_table(sentiment, ["ticker", "label", "speculation_risk", "reasons"])
     with col_right:
         st.subheader("Personal Trading Behavior Notes")
         if behaviors:
@@ -1492,10 +2035,7 @@ def render_ai_investment_platform() -> None:
             st.write("No clear behavioral bias alerts were triggered.")
 
     st.subheader("Open-Source Engine Status")
-    if integrations.empty:
-        render_missing_results()
-    else:
-        st.dataframe(integrations[["name", "role", "available"]], width="stretch", hide_index=True)
+    render_snapshot_table(integrations, ["name", "role", "available"])
 
     report_path = latest_investment_report_path(snapshot)
     report = load_latest_investment_report(file_signature(report_path))
@@ -1504,54 +2044,116 @@ def render_ai_investment_platform() -> None:
             st.markdown(report)
 
 
-def render_stock_explorer(tickers: list[str]) -> None:
-    render_page_title(
-        "Single Name Explorer",
-        "Stock Explorer",
-        "Inspect prices, technical indicators, return windows, and risk characteristics for project tickers or any Yahoo Finance symbol.",
-    )
-    features = load_features()
-    config = load_dashboard_config()
-    data_config = config.get("data", {})
-    start = data_config.get("start", "2015-01-01")
-    end = data_config.get("end", "2026-12-31")
-    features = render_project_data_status(features, tickers, start)
+def market_timestamp() -> datetime:
+    try:
+        return datetime.now(ZoneInfo("America/New_York"))
+    except Exception:  # pragma: no cover - timezone database fallback
+        return datetime.now(timezone.utc)
 
-    if features.empty:
-        render_missing_results()
-        return
 
-    col1, col2, col3 = st.columns([1, 2, 0.6])
-    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
-    external = normalize_ticker(
-        col2.text_input(
-            "Live Ticker Lookup",
-            placeholder="Enter a Yahoo Finance symbol, e.g. PLTR, TSM, BABA, 0700.HK, 301321",
-        )
-    )
-    refresh_external = col3.button("Refresh", disabled=not bool(external))
-    if refresh_external:
-        load_external_ticker_features.clear()
+def us_market_is_open(now: datetime | None = None) -> bool:
+    current = now or market_timestamp()
+    return current.weekday() < 5 and datetime_time(9, 30) <= current.time() < datetime_time(16, 0)
 
-    ticker = external or selected
-    use_external = bool(external and external not in set(tickers))
 
-    if use_external:
-        try:
-            with st.spinner(f"Downloading {ticker} from yfinance and computing indicators..."):
-                stock = load_external_ticker_features(ticker, start=start, end=end)
-        except Exception as exc:
-            st.error(f"Unable to download {ticker}: {exc}")
-            st.caption(
-                "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
-                "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
-            )
-            return
-        source_label = "Live yfinance lookup"
+def format_market_data_timestamp(value: object) -> str:
+    try:
+        timestamp = pd.Timestamp(value)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.tz_localize("America/New_York")
+        else:
+            timestamp = timestamp.tz_convert("America/New_York")
+        return timestamp.strftime("%Y-%m-%d %H:%M:%S %Z")
+    except (TypeError, ValueError):
+        return "not available"
+
+
+def latest_cached_live_quote(ticker: str) -> dict[str, object] | None:
+    with _live_quote_lock:
+        quote = _live_quote_memory.get(ticker)
+        return dict(quote) if quote else None
+
+
+def latest_cached_live_history(ticker: str) -> pd.DataFrame | None:
+    with _live_quote_lock:
+        history = _live_history_memory.get(ticker)
+        return history.copy() if history is not None else None
+
+
+def live_rate_limit_active() -> bool:
+    with _live_quote_lock:
+        return time.monotonic() < _live_rate_limit_until
+
+
+def get_live_quote(ticker: str) -> tuple[dict[str, object] | None, str]:
+    """Use one shared cooldown to prevent public sessions from hammering Yahoo."""
+
+    global _live_rate_limit_until
+    cached = latest_cached_live_quote(ticker)
+    now = time.monotonic()
+    with _live_quote_lock:
+        cooldown_active = now < _live_rate_limit_until
+    if cooldown_active:
+        return cached, "cached" if cached else "historical_fallback"
+
+    try:
+        quote = load_live_ticker_quote(ticker)
+    except Exception as error:
+        if is_yahoo_rate_limit_error(error):
+            with _live_quote_lock:
+                _live_rate_limit_until = now + LIVE_RATE_LIMIT_COOLDOWN
+            return cached, "cached" if cached else "historical_fallback"
+        return cached, "cached" if cached else "historical_fallback"
+
+    with _live_quote_lock:
+        _live_quote_memory[ticker] = dict(quote)
+    return quote, "live"
+
+
+def enter_live_rate_limit_cooldown() -> None:
+    global _live_rate_limit_until
+    with _live_quote_lock:
+        _live_rate_limit_until = time.monotonic() + LIVE_RATE_LIMIT_COOLDOWN
+
+
+def render_live_quote_status(
+    status: str,
+    checked_at: datetime,
+    quote: dict[str, object] | None,
+    historical_timestamp: object | None = None,
+) -> None:
+    checked_text = checked_at.strftime("%H:%M:%S %Z")
+    data_timestamp = quote.get("market_data_timestamp") if quote else historical_timestamp
+    data_text = format_market_data_timestamp(data_timestamp)
+    if status == "live":
+        st.caption(f"LIVE · Live quote retrieved: {checked_text} · Data timestamp: {data_text}")
+    elif status == "cached":
+        st.warning("CACHED · Yahoo data is temporarily rate-limited or unavailable. Showing the last cached quote.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
+    elif status == "market_closed":
+        st.info("MARKET CLOSED · The US market is closed. Showing the latest available market price.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
     else:
-        stock = features[features["ticker"].eq(ticker)].copy()
-        source_label = "Processed project dataset"
+        st.warning("HISTORICAL FALLBACK · Live data is unavailable. Showing the latest historical observation.")
+        st.caption(f"Data timestamp: {data_text} · Last checked: {checked_text}")
 
+
+def quote_price_label(quote_status: str | None) -> str:
+    return {
+        "live": "Latest Live Price",
+        "cached": "Last Cached Price",
+        "market_closed": "Latest Available Price",
+        "historical_fallback": "Latest Historical Price",
+    }.get(quote_status, "Latest Adjusted Close")
+
+
+def render_ticker_analysis(
+    stock: pd.DataFrame,
+    ticker: str,
+    source_label: str,
+    live_quote: dict[str, object] | None = None,
+    quote_status: str | None = None,
+) -> None:
     if stock.empty:
         st.warning(f"No market data was found for {ticker}. Check the ticker symbol and try again.")
         return
@@ -1562,7 +2164,9 @@ def render_stock_explorer(tickers: list[str]) -> None:
     max_dd, _ = maximum_drawdown(returns)
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Latest Adjusted Close", f"{latest['adjusted_close']:.2f}")
+    latest_price = live_quote.get("price") if live_quote else latest["adjusted_close"]
+    price_label = quote_price_label(quote_status)
+    col1.metric(price_label, f"{float(latest_price):.2f}")
     col2.metric("21D Return", percent_value(latest.get("return_21d")))
     col3.metric("126D Return", percent_value(latest.get("return_126d")))
     col4.metric("Maximum Drawdown", percent_value(max_dd))
@@ -1617,6 +2221,129 @@ def render_stock_explorer(tickers: list[str]) -> None:
     ]
     shown = [column for column in indicator_cols if column in stock.columns]
     st.dataframe(stock[["date", "ticker", *shown]].tail(30), width="stretch", hide_index=True)
+
+
+@st.fragment(run_every="30s")
+def render_live_ticker_result(
+    ticker: str,
+    start: str,
+    end: str,
+    fallback_stock: pd.DataFrame | None = None,
+) -> None:
+    checked_at = market_timestamp()
+    cached_history = latest_cached_live_history(ticker)
+    project_history = fallback_stock.copy() if fallback_stock is not None else pd.DataFrame()
+
+    # A provider cooldown is process-wide so public users do not collectively
+    # keep retrying Yahoo after it has returned a rate-limit response.
+    if live_rate_limit_active():
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        cached_quote = latest_cached_live_quote(ticker)
+        if stock.empty:
+            render_live_quote_status("historical_fallback", checked_at, None)
+            st.warning("No cached market data is available while Yahoo Finance is cooling down.")
+            return
+        quote_status = "cached" if cached_quote else "historical_fallback"
+        render_live_quote_status(quote_status, checked_at, cached_quote, stock["date"].max())
+        source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+        render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=quote_status)
+        return
+
+    market_open = us_market_is_open(checked_at)
+    # When the US market is closed, a previously available frame is enough to
+    # keep the page useful without starting another historical request.
+    if not market_open and (cached_history is not None and not cached_history.empty or not project_history.empty):
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        cached_quote = latest_cached_live_quote(ticker)
+        render_live_quote_status("market_closed", checked_at, cached_quote, stock["date"].max())
+        source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+        render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status="market_closed")
+        return
+
+    try:
+        with st.spinner(f"Loading cached history for {ticker} and computing indicators..."):
+            stock = load_external_ticker_features(ticker, start=start, end=end)
+    except Exception as error:
+        if is_yahoo_rate_limit_error(error):
+            enter_live_rate_limit_cooldown()
+            cached_quote = latest_cached_live_quote(ticker)
+            stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+            if stock.empty:
+                render_live_quote_status("historical_fallback", checked_at, None)
+                st.warning("No cached market data is available while Yahoo Finance is cooling down.")
+                return
+            quote_status = "cached" if cached_quote else "historical_fallback"
+            render_live_quote_status(quote_status, checked_at, cached_quote, stock["date"].max())
+            source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+            render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=quote_status)
+            return
+        stock = cached_history if cached_history is not None and not cached_history.empty else project_history
+        if not stock.empty:
+            cached_quote = latest_cached_live_quote(ticker)
+            status = "market_closed" if not market_open else ("cached" if cached_quote else "historical_fallback")
+            render_live_quote_status(status, checked_at, cached_quote, stock["date"].max())
+            source = "Cached yfinance history" if cached_history is not None and not cached_history.empty else "Processed project dataset fallback"
+            render_ticker_analysis(stock, ticker, source, live_quote=cached_quote, quote_status=status)
+            return
+        st.error(f"Yahoo Finance did not return usable historical data for {ticker}. Check the symbol or try again later.")
+        st.caption(
+            "Yahoo Finance can rate-limit or interrupt requests. Mainland China A-share codes are automatically "
+            "expanded with `.SZ` or `.SS`; Hong Kong tickers should still use full symbols such as `0700.HK`."
+        )
+        return
+
+    with _live_quote_lock:
+        _live_history_memory[ticker] = stock.copy()
+
+    if market_open:
+        live_quote, quote_status = get_live_quote(ticker)
+    else:
+        live_quote, quote_status = latest_cached_live_quote(ticker), "market_closed"
+    render_live_quote_status(quote_status, checked_at, live_quote, stock["date"].max())
+    render_ticker_analysis(stock, ticker, "Cached yfinance history", live_quote=live_quote, quote_status=quote_status)
+
+
+def render_stock_explorer(tickers: list[str]) -> None:
+    render_page_title(
+        "Single Name Explorer",
+        "Stock Explorer",
+        "Inspect prices, technical indicators, return windows, and risk characteristics for project tickers or any Yahoo Finance symbol.",
+    )
+    features = load_features()
+    config = load_dashboard_config()
+    data_config = config.get("data", {})
+    start = data_config.get("start", "2015-01-01")
+    end = data_config.get("end", "2026-12-31")
+    features = render_project_data_status(features, tickers, start)
+
+    if features.empty:
+        render_missing_results()
+        return
+
+    col1, col2, col3 = st.columns([1, 2, 0.6])
+    selected = col1.selectbox("Project Universe", tickers, index=tickers.index("NVDA") if "NVDA" in tickers else 0)
+    external = normalize_ticker(
+        col2.text_input(
+            "Live Ticker Lookup",
+            placeholder="Enter a Yahoo Finance symbol, e.g. PLTR, TSM, BABA, 0700.HK, 301321",
+        )
+    )
+    refresh_external = col3.button("Refresh", disabled=not bool(external))
+    if refresh_external:
+        load_external_ticker_prices.clear()
+        load_external_ticker_features.clear()
+        load_live_ticker_quote.clear()
+
+    ticker = external or selected
+    use_external = bool(external)
+
+    if use_external:
+        project_fallback = features[features["ticker"].eq(ticker)].copy()
+        render_live_ticker_result(ticker, start, end, project_fallback)
+        return
+
+    stock = features[features["ticker"].eq(ticker)].copy()
+    render_ticker_analysis(stock, ticker, "Processed project dataset")
 
 
 def strategy_weights(features: pd.DataFrame, strategy: str, top_n: int, entry_z: float) -> pd.DataFrame:
@@ -1801,6 +2528,9 @@ def main() -> None:
     if module == "home":
         render_home_hero(len(tickers))
     else:
+        st.markdown('<div class="back-home-row">', unsafe_allow_html=True)
+        st.button("Back to Home", key="back_to_home", on_click=set_active_module, args=("home",))
+        st.markdown("</div>", unsafe_allow_html=True)
         render_command_search(tickers)
         render_workspace_frame(module)
     pages[module]()
