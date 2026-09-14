@@ -30,6 +30,13 @@ PUBLIC_FILES = (
     Path("demo_data/data/processed/data_quality_report.csv"),
     Path("demo_data/data/processed/feature_dataset.csv"),
 )
+SNAPSHOT_FUNDAMENTAL_COLUMNS = (
+    "pe_ratio",
+    "pb_ratio",
+    "market_cap",
+    "roe",
+    "revenue_growth",
+)
 SENSITIVE_TEXT = re.compile(
     r"(?i)(?:/Users/|/var/folders|TemporaryItems|account(?:\s*(?:number|no\.?|#))?|"
     r"holdings?|brokerage|balances?|transactions?|IBKR|Moomoo|api[_ -]?key|"
@@ -67,6 +74,42 @@ def _read_previous_snapshot(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=["date", "ticker"])
     return _normalise(pd.read_csv(path))
+
+
+def preserve_published_fundamentals(
+    candidate: pd.DataFrame,
+    previous: pd.DataFrame,
+) -> pd.DataFrame:
+    """Keep published snapshot fundamentals stable for existing date/ticker rows."""
+
+    out = _normalise(candidate)
+    if out.empty or previous.empty or not {"date", "ticker"}.issubset(out.columns):
+        return out
+
+    published = _normalise(previous)
+    columns = [
+        column
+        for column in SNAPSHOT_FUNDAMENTAL_COLUMNS
+        if column in out.columns and column in published.columns
+    ]
+    if not columns or not {"date", "ticker"}.issubset(published.columns):
+        return out
+
+    marker = "__published_fundamental_match"
+    published_values = published[["date", "ticker", *columns]].copy()
+    published_values[marker] = True
+    merged = out.merge(
+        published_values,
+        on=["date", "ticker"],
+        how="left",
+        sort=False,
+        validate="one_to_one",
+        suffixes=("", "__published"),
+    )
+    existing_rows = merged[marker].eq(True)
+    for column in columns:
+        merged.loc[existing_rows, column] = merged.loc[existing_rows, f"{column}__published"]
+    return merged.loc[:, out.columns]
 
 
 def _canonicalise_public_frame(
@@ -301,6 +344,13 @@ def update_public_snapshot(project_root: Path, start: str | None = None) -> Refr
         candidate_quality = temporary_root / "data" / "processed" / "data_quality_report.csv"
         candidate_readme = temporary_root / "README.md"
         candidate_feature_frame = pd.read_csv(candidate_feature)
+        candidate_feature_frame = preserve_published_fundamentals(candidate_feature_frame, previous)
+        _write_canonical_csv(
+            candidate_feature_frame,
+            candidate_feature,
+            ["date", "ticker"],
+            list(candidate_feature_frame.columns),
+        )
         candidate_clean_frame = pd.read_csv(candidate_clean)
         candidate_quality_frame = pd.read_csv(candidate_quality)
         metrics = validate_refresh_outputs(

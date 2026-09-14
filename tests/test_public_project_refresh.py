@@ -9,6 +9,7 @@ import scripts.refresh_public_project_data as refresh_cli
 from scripts.refresh_public_project_data import (
     RefreshValidationError,
     publish_csv_if_changed,
+    preserve_published_fundamentals,
     public_csv_changed,
     validate_refresh_outputs,
 )
@@ -109,6 +110,72 @@ def test_real_numeric_change_and_new_date_are_detected(tmp_path: Path) -> None:
     assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is True
 
 
+def test_published_fundamentals_stay_stable_and_new_rows_use_current_values() -> None:
+    previous, _, _ = _frames()
+    previous = previous.assign(
+        pe_ratio=10.0,
+        pb_ratio=2.0,
+        market_cap=1_000_000.0,
+        roe=0.10,
+        revenue_growth=0.05,
+    )
+    candidate = previous.copy()
+    for column, value in {
+        "pe_ratio": 20.0,
+        "pb_ratio": 4.0,
+        "market_cap": 2_000_000.0,
+        "roe": 0.20,
+        "revenue_growth": 0.15,
+    }.items():
+        candidate[column] = value
+    new_rows = candidate.iloc[[0]].assign(date=pd.Timestamp("2026-09-12"))
+    stabilized = preserve_published_fundamentals(
+        pd.concat([candidate, new_rows], ignore_index=True),
+        previous,
+    )
+
+    existing_rows = stabilized[stabilized["date"] < pd.Timestamp("2026-09-12")]
+    new_row = stabilized[stabilized["date"] == pd.Timestamp("2026-09-12")].iloc[0]
+    assert existing_rows["pe_ratio"].eq(10.0).all()
+    assert existing_rows["pb_ratio"].eq(2.0).all()
+    assert existing_rows["market_cap"].eq(1_000_000.0).all()
+    assert existing_rows["roe"].eq(0.10).all()
+    assert existing_rows["revenue_growth"].eq(0.05).all()
+    assert new_row["pe_ratio"] == 20.0
+    assert new_row["pb_ratio"] == 4.0
+    assert new_row["market_cap"] == 2_000_000.0
+    assert new_row["roe"] == 0.20
+    assert new_row["revenue_growth"] == 0.15
+
+
+def test_changed_fundamentals_alone_do_not_change_public_snapshot(tmp_path: Path) -> None:
+    previous, clean, quality = _frames()
+    previous = previous.assign(
+        pe_ratio=10.0,
+        pb_ratio=2.0,
+        market_cap=1_000_000.0,
+        roe=0.10,
+        revenue_growth=0.05,
+    )
+    candidate = previous.copy()
+    candidate[["pe_ratio", "pb_ratio", "market_cap", "roe", "revenue_growth"]] = [
+        20.0,
+        4.0,
+        2_000_000.0,
+        0.20,
+        0.15,
+    ]
+    existing_path = tmp_path / "existing.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    previous.to_csv(existing_path, index=False)
+    stabilized = preserve_published_fundamentals(candidate, previous)
+    stabilized.to_csv(candidate_path, index=False)
+
+    assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is False
+    assert stabilized["close"].equals(clean["close"])
+    assert len(quality) == len(EXPECTED)
+
+
 def test_changed_csv_uses_canonical_columns_floats_and_line_endings(tmp_path: Path) -> None:
     feature, _, _ = _frames()
     existing_path = tmp_path / "existing.csv"
@@ -126,6 +193,21 @@ def test_changed_csv_uses_canonical_columns_floats_and_line_endings(tmp_path: Pa
 
 def test_identical_cli_refresh_reports_no_change_and_preserves_bytes(tmp_path: Path, monkeypatch, capsys) -> None:
     feature, clean, quality = _frames()
+    feature = feature.assign(
+        pe_ratio=10.0,
+        pb_ratio=2.0,
+        market_cap=1_000_000.0,
+        roe=0.10,
+        revenue_growth=0.05,
+    )
+    refreshed_feature = feature.copy()
+    refreshed_feature[["pe_ratio", "pb_ratio", "market_cap", "roe", "revenue_growth"]] = [
+        20.0,
+        4.0,
+        2_000_000.0,
+        0.20,
+        0.15,
+    ]
     (tmp_path / "config.yaml").write_text(
         "universe:\n  - AAPL\n  - MSFT\ndata:\n  start: '2023-01-01'\n",
         encoding="utf-8",
@@ -146,7 +228,7 @@ def test_identical_cli_refresh_reports_no_change_and_preserves_bytes(tmp_path: P
     def fake_refresh(temporary_root: Path, _tickers, _start) -> None:
         processed = temporary_root / "data/processed"
         processed.mkdir(parents=True)
-        feature.iloc[::-1][list(reversed(feature.columns))].to_csv(
+        refreshed_feature.iloc[::-1][list(reversed(refreshed_feature.columns))].to_csv(
             processed / "feature_dataset.csv", index=False, lineterminator="\r\n"
         )
         clean.to_csv(processed / "clean_stock_data.csv", index=False)
@@ -160,4 +242,10 @@ def test_identical_cli_refresh_reports_no_change_and_preserves_bytes(tmp_path: P
     assert metrics.data_changed is False
     assert existing_feature.read_bytes() == before_feature
     assert existing_quality.read_bytes() == before_quality
-    assert "Data changed: no" in capsys.readouterr().out
+
+    second_metrics = refresh_cli.update_public_snapshot(tmp_path)
+
+    assert second_metrics.data_changed is False
+    assert existing_feature.read_bytes() == before_feature
+    assert existing_quality.read_bytes() == before_quality
+    assert capsys.readouterr().out.count("Data changed: no") == 2
