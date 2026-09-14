@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
-from scripts.refresh_public_project_data import RefreshValidationError, validate_refresh_outputs
+import scripts.refresh_public_project_data as refresh_cli
+from scripts.refresh_public_project_data import (
+    RefreshValidationError,
+    publish_csv_if_changed,
+    public_csv_changed,
+    validate_refresh_outputs,
+)
 
 
 EXPECTED = {"AAPL", "MSFT"}
@@ -67,3 +75,89 @@ def test_suspicious_row_loss_is_rejected() -> None:
     previous = pd.concat([feature] * 10, ignore_index=True)
     with pytest.raises(RefreshValidationError, match="suspiciously low"):
         validate_refresh_outputs(feature, clean, quality, EXPECTED, EXPECTED_LATEST, previous)
+
+
+def test_identical_candidate_is_not_rewritten_and_reports_no_change(tmp_path: Path) -> None:
+    feature, _, _ = _frames()
+    existing_path = tmp_path / "existing.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    feature.to_csv(existing_path, index=False, lineterminator="\n")
+    feature.iloc[::-1][list(reversed(feature.columns))].to_csv(candidate_path, index=False, lineterminator="\r\n")
+    before = existing_path.read_bytes()
+
+    assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is False
+    assert publish_csv_if_changed(candidate_path, existing_path, ["date", "ticker"]) is False
+    assert existing_path.read_bytes() == before
+
+
+def test_real_numeric_change_and_new_date_are_detected(tmp_path: Path) -> None:
+    feature, _, _ = _frames()
+    existing_path = tmp_path / "existing.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    feature.to_csv(existing_path, index=False)
+
+    changed = feature.copy()
+    changed.loc[0, "close"] = 100.5
+    changed.to_csv(candidate_path, index=False)
+    assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is True
+
+    new_date = pd.concat(
+        [feature, feature.iloc[[0]].assign(date=pd.Timestamp("2026-09-12"))],
+        ignore_index=True,
+    )
+    new_date.to_csv(candidate_path, index=False)
+    assert public_csv_changed(candidate_path, existing_path, ["date", "ticker"]) is True
+
+
+def test_changed_csv_uses_canonical_columns_floats_and_line_endings(tmp_path: Path) -> None:
+    feature, _, _ = _frames()
+    existing_path = tmp_path / "existing.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    feature.to_csv(existing_path, index=False)
+    changed = feature.iloc[::-1][list(reversed(feature.columns))].copy()
+    changed.loc[0, "close"] = 100.25
+    changed.to_csv(candidate_path, index=False, lineterminator="\r\n")
+
+    assert publish_csv_if_changed(candidate_path, existing_path, ["date", "ticker"]) is True
+    output = existing_path.read_bytes()
+    assert b"\r\n" not in output
+    assert output.splitlines()[0].decode() == ",".join(feature.columns)
+
+
+def test_identical_cli_refresh_reports_no_change_and_preserves_bytes(tmp_path: Path, monkeypatch, capsys) -> None:
+    feature, clean, quality = _frames()
+    (tmp_path / "config.yaml").write_text(
+        "universe:\n  - AAPL\n  - MSFT\ndata:\n  start: '2023-01-01'\n",
+        encoding="utf-8",
+    )
+    public_root = tmp_path / "demo_data"
+    (public_root / "data/processed").mkdir(parents=True)
+    (public_root / "README.md").write_text(
+        "The equity feature snapshot covers 2023-01-03 through 2026-09-11;\n",
+        encoding="utf-8",
+    )
+    existing_feature = public_root / "data/processed/feature_dataset.csv"
+    existing_quality = public_root / "data/processed/data_quality_report.csv"
+    feature.to_csv(existing_feature, index=False, lineterminator="\n")
+    quality.to_csv(existing_quality, index=False, lineterminator="\n")
+    before_feature = existing_feature.read_bytes()
+    before_quality = existing_quality.read_bytes()
+
+    def fake_refresh(temporary_root: Path, _tickers, _start) -> None:
+        processed = temporary_root / "data/processed"
+        processed.mkdir(parents=True)
+        feature.iloc[::-1][list(reversed(feature.columns))].to_csv(
+            processed / "feature_dataset.csv", index=False, lineterminator="\r\n"
+        )
+        clean.to_csv(processed / "clean_stock_data.csv", index=False)
+        quality.iloc[::-1].to_csv(processed / "data_quality_report.csv", index=False, lineterminator="\r\n")
+
+    monkeypatch.setattr(refresh_cli, "refresh_project_market_data", fake_refresh)
+    monkeypatch.setattr(refresh_cli, "expected_latest_market_date", lambda: EXPECTED_LATEST)
+
+    metrics = refresh_cli.update_public_snapshot(tmp_path)
+
+    assert metrics.data_changed is False
+    assert existing_feature.read_bytes() == before_feature
+    assert existing_quality.read_bytes() == before_quality
+    assert "Data changed: no" in capsys.readouterr().out
