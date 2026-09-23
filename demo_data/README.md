@@ -5,7 +5,7 @@ local research outputs are not present, such as on Streamlit Community Cloud.
 
 The snapshot is derived from public market data and generated research outputs.
 It is intentionally smaller than the full local dataset so the deployed demo can
-load quickly. The equity feature snapshot covers 2023-01-03 through 2026-09-21;
+load quickly. The equity feature snapshot covers 2023-01-03 through 2026-09-22;
 `results/backtest_manifest.json` records the cutoff, assumptions, validation
 warnings, and artifact fingerprints;
 the complete research pipeline can still be reproduced locally by running:
